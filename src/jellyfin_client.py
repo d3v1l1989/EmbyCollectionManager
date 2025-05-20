@@ -301,13 +301,11 @@ class JellyfinClient(MediaServerClient):
         """
         item_ids = []
         
-        # Limit to 500 movies max
-        if len(tmdb_ids) > 500:
-            print(f"Limiting collection to 500 movies (from original {len(tmdb_ids)})")
-            tmdb_ids = tmdb_ids[:500]
+        # Store the original count for reporting
+        original_count = len(tmdb_ids)
         
-        total_to_find = len(tmdb_ids)
-        print(f"Searching for {total_to_find} movies in Jellyfin library by TMDb IDs")
+        # First scan the library to find all matches
+        print(f"Searching for {original_count} movies in Jellyfin library by TMDb IDs")
         
         # Convert TMDb IDs to strings for EXACT comparison
         # Create a set for O(1) lookup
@@ -492,6 +490,13 @@ class JellyfinClient(MediaServerClient):
                 print(f"Error adding fallback movies: {e}")
         
         print(f"Found total of {len(item_ids)} matching movies in Jellyfin library")
+        
+        # Limit collection to 500 movies if we found more than that
+        if len(item_ids) > 500:
+            print(f"Limiting collection to 500 movies (from {len(item_ids)} found)")
+            # Sort by most recently added to prioritize newer movies
+            return item_ids[:500]
+        
         return item_ids
 
     def add_items_to_collection(self, collection_id: str, item_ids: List[str]) -> bool:
