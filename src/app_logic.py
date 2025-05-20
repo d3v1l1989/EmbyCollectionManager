@@ -114,8 +114,8 @@ def main():
         tmdb_ids = []
         try:
             if recipe['source_type'] == 'tmdb_discover_individual_movies':
-                # Ignore item_limit to get all available movies
-                tmdb_ids = [movie['id'] for movie in tmdb.discover_movies(recipe['tmdb_discover_params'], None)]
+                # Set a reasonable limit of 1000 movies (50 pages × 20 movies per page)
+                tmdb_ids = [movie['id'] for movie in tmdb.discover_movies(recipe['tmdb_discover_params'], 50)]
             elif recipe['source_type'] == 'tmdb_series_collection':
                 collection = tmdb.get_tmdb_series_collection_details(recipe['tmdb_collection_id'])
                 tmdb_ids = [part['id'] for part in collection.get('parts', [])]
