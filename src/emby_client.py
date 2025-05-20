@@ -268,12 +268,46 @@ class EmbyClient(MediaServerClient):
         if not item_ids:
             print("No items to add to collection")
             return False
-        
-        # For real collection IDs, try to update items
+            
+        # For real collection IDs, we need to aggressively deduplicate items
         try:
-            # Format: /Collections/{collection_id}/Items?api_key=XXX&Ids=id1,id2,id3
-            # Following the approach shown in the other Emby API code
-            ids_param = ",".join(item_ids)
+            # First, get all movie names to avoid adding duplicate movies with different IDs
+            # This handles cases where the same movie exists in multiple qualities
+            print(f"Fetching movie details to prevent duplicates...")
+            movie_names = {}
+            deduplicated_ids = []
+            
+            for item_id in item_ids:
+                try:
+                    # Use the Items endpoint to get movie details
+                    item_url = f"{self.server_url}/Users/{self.user_id}/Items/{item_id}?api_key={self.api_key}"
+                    response = self.session.get(item_url, timeout=15)
+                    
+                    if response.status_code == 200:
+                        item_data = response.json()
+                        movie_name = item_data.get('Name', '').lower()
+                        
+                        if movie_name and movie_name not in movie_names:
+                            # First time we've seen this movie name
+                            movie_names[movie_name] = item_id
+                            deduplicated_ids.append(item_id)
+                            print(f"  Including: {movie_name}")
+                        else:
+                            print(f"  Skipping duplicate: {movie_name}")
+                except Exception as e:
+                    print(f"Error getting movie details for {item_id}: {e}")
+                    # If we can't get details, include it anyway
+                    if item_id not in deduplicated_ids:
+                        deduplicated_ids.append(item_id)
+            
+            print(f"After deduplication: {len(deduplicated_ids)} of {len(item_ids)} movies remain")
+            
+            if not deduplicated_ids:
+                print("No items remain after deduplication")
+                return False
+            
+            # Now add the deduplicated items to the collection
+            ids_param = ",".join(deduplicated_ids)
             url = f"{self.server_url}/Collections/{collection_id}/Items"
             
             params = {
@@ -281,14 +315,14 @@ class EmbyClient(MediaServerClient):
                 'Ids': ids_param
             }
             
-            print(f"Adding {len(item_ids)} items to collection {collection_id}")
-            print(f"First few items: {item_ids[:3] if len(item_ids) > 3 else item_ids}")
+            print(f"Adding {len(deduplicated_ids)} unique items to collection {collection_id}")
+            print(f"First few items: {deduplicated_ids[:3] if len(deduplicated_ids) > 3 else deduplicated_ids}")
             
             response = self.session.post(url, params=params, timeout=15)
             
             # Emby returns 204 No Content on success
             if response.status_code == 204:
-                print(f"Successfully added {len(item_ids)} items to collection {collection_id}")
+                print(f"Successfully added {len(deduplicated_ids)} unique items to collection {collection_id}")
                 return True
             else:
                 print(f"Failed to add items to collection: {response.status_code}")
