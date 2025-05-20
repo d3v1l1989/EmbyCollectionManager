@@ -61,7 +61,8 @@ services:
       - ./config:/app/config:ro
     env_file:
       - .env
-    command: ["--sync_emby", "--sync_jellyfin"]
+    # The sync targets are now configured via the SYNC_TARGETS variable in your .env file
+    command: ["/bin/sh", "-c", "python main.py $SYNC_TARGETS"]
     restart: unless-stopped
 ```
 
@@ -71,6 +72,24 @@ docker compose logs -f tmdbcollector
 ```
 
 ---
+
+**Example `.env` file for Docker Compose:**
+```env
+TMDB_API_KEY=your_tmdb_api_key
+EMBY_API_KEY=your_emby_api_key
+EMBY_URL=http://localhost:8096
+EMBY_USER_ID=your_emby_user_id
+JELLYFIN_API_KEY=your_jellyfin_api_key
+JELLYFIN_URL=http://localhost:8096
+JELLYFIN_USER_ID=your_jellyfin_user_id
+# Choose which server(s) to sync: --sync_emby, --sync_jellyfin, or both (space separated)
+SYNC_TARGETS=--sync_emby
+```
+
+- Edit the `SYNC_TARGETS` variable in your `.env` file to control which server(s) to sync to.
+  - For Emby only: `SYNC_TARGETS=--sync_emby`
+  - For Jellyfin only: `SYNC_TARGETS=--sync_jellyfin`
+  - For both: `SYNC_TARGETS=--sync_emby --sync_jellyfin`
 
 ## Docker (Standalone)
 

@@ -8,7 +8,7 @@ services:
       - ./config:/app/config:ro
     env_file:
       - .env
-    # Choose which server(s) to sync by editing the command below:
-    #   --sync_emby for Emby, --sync_jellyfin for Jellyfin, or both
-    command: ["--sync_emby", "--sync_jellyfin"]
+    # The sync target(s) are now controlled via the SYNC_TARGETS variable in your .env file.
+    # Example: SYNC_TARGETS="--sync_emby --sync_jellyfin"
+    command: ["/bin/sh", "-c", "python main.py $SYNC_TARGETS"]
     restart: unless-stopped
