@@ -263,38 +263,60 @@ class JellyfinClient(MediaServerClient):
                     processed_count += len(batch_tmdb_ids)
                     progress_pct = (processed_count / len(tmdb_ids)) * 100 if tmdb_ids else 0
                     
-                    # Only report detailed results for significant batches
-                    if batch_idx % progress_report_interval == 0 or batch_idx == max_batches - 1 or batch_matches > 0:
-                        print(f"Found {batch_matches} matches in batch {batch_idx + 1}/{max_batches} ({progress_pct:.1f}% complete)")
+                    # Create a set of existing IDs for faster lookup
+                    existing_ids = set(item_ids)
                     
                     # Track how many new movies we find with each batch
                     new_in_batch = 0
+                    batch_item_ids = []
                     
-                    # Process the matches
+                    # Process the matches - collect all the new IDs first
                     for item in data['Items']:
                         name = item.get('Name', '(unknown)')
                         item_id = item['Id']
                         
                         # Only add the item if we haven't already found it
-                        if item_id not in item_ids:  # Avoid duplicates
-                            item_ids.append(item_id)
-                            new_in_batch += 1
-                            
-                            # Only log individual items for smaller collections or initial batches
-                            if len(item_ids) < 100 or batch_idx < 2:  # Limit logging for very large collections
-                                print(f"  - Found match: {name} (ID: {item_id})")
+                        if item_id not in existing_ids:  # Avoid duplicates
+                            batch_item_ids.append((item_id, name))
+                            existing_ids.add(item_id)  # Update the lookup set
                     
-                    # Report how many new items were found in this batch
-                    if new_in_batch > 0 and (len(item_ids) >= 100 and batch_idx >= 2):
-                        print(f"  - Found {new_in_batch} new matches in this batch (total so far: {len(item_ids)})")
+                    # Now add all new IDs to the master list
+                    new_in_batch = len(batch_item_ids)
+                    for item_id, name in batch_item_ids:
+                        item_ids.append(item_id)
+                    
+                    # Report results for this batch
+                    if batch_idx % progress_report_interval == 0 or batch_idx == max_batches - 1 or new_in_batch > 0:
+                        print(f"Found {batch_matches} matches in batch {batch_idx + 1}/{max_batches}, added {new_in_batch} new items (total: {len(item_ids)})")
+                    
+                    # Only log individual items for smaller collections or initial batches
+                    if len(item_ids) < 100 or batch_idx < 2:  # Limit logging for very large collections
+                        for item_id, name in batch_item_ids[:min(50, len(batch_item_ids))]:
+                            print(f"  - Found match: {name} (ID: {item_id})")
+                    
+                    # For large batches, just report summary
+                    elif new_in_batch > 0:
+                        print(f"  - Added {new_in_batch} new unique movies from this batch (total now: {len(item_ids)})")
+                        if new_in_batch > 0 and new_in_batch <= 5:
+                            # Show just a few examples when only a small number of new items were found
+                            for item_id, name in batch_item_ids:
+                                print(f"    - Added: {name} (ID: {item_id})")
+                        elif new_in_batch > 5:
+                            # Show a small sample of the new additions
+                            for item_id, name in batch_item_ids[:3]:
+                                print(f"    - Added: {name} (ID: {item_id})")
+                            print(f"    - ... and {new_in_batch - 3} more items")
                 elif batch_idx % progress_report_interval == 0 or batch_idx == max_batches - 1:
                     print(f"No matches found in batch {batch_idx + 1}/{max_batches}")
         except Exception as e:
             print(f"Error searching by batched provider IDs: {e}")
         
-        # Only use the full library scan if we found a very small percentage of movies
-        # and if we searched for a large number of movies to begin with
-        if len(item_ids) < 100 and total_to_find > 500 and (len(item_ids) < total_to_find / 20):  # Very low match rate
+        # This check ensures we're not returning early with just 100 matches
+        # If we have found a substantial number of movies and have processed most batches, skip the full scan
+        print(f"Batch processing complete. Found {len(item_ids)} total unique movies across all batches.")
+        
+        # Only use the library scan as a fallback if we found a very small percentage of what we expected
+        if len(item_ids) < 200 and total_to_find > 500 and (len(item_ids) < total_to_find / 20):  # Very low match rate
             print(f"Only found {len(item_ids)} movies with batch method (out of {total_to_find} TMDb IDs), trying full library scan...")
         else:
             # We have a reasonable number of matches from batch method, skip the full scan
