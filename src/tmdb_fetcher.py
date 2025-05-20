@@ -14,24 +14,58 @@ class TmdbClient:
     def discover_movies(self, params, page_limit=1):
         """
         Fetch movies from TMDb /discover/movie with given params. Handles pagination up to page_limit.
+        If page_limit is None, fetch all available pages.
         Returns a list of movie dicts.
         """
         url = f"{self.BASE_URL}/discover/movie"
         all_results = []
-        for page in range(1, page_limit+1):
+        seen_ids = set()  # Track already seen movie IDs to prevent duplicates
+        
+        # Start with page 1
+        current_page = 1
+        total_pages = 1  # Will be updated from the first response
+        
+        # Continue fetching until we reach the limit or get all pages
+        while True:
+            if page_limit is not None and current_page > page_limit:
+                break
+                
             req_params = dict(params)
-            req_params["page"] = page
+            req_params["page"] = current_page
+            
             try:
                 resp = self.session.get(url, params=req_params, timeout=10)
                 resp.raise_for_status()
                 data = resp.json()
+                
+                # Get total pages from first response
+                if current_page == 1:
+                    total_pages = data.get("total_pages", 1)
+                    self.logger.info(f"TMDb discover found {total_pages} total pages of results")
+                
+                # Add new unique results
                 results = data.get("results", [])
-                all_results.extend(results)
-                if page >= data.get("total_pages", 1):
+                for movie in results:
+                    if movie["id"] not in seen_ids:
+                        seen_ids.add(movie["id"])
+                        all_results.append(movie)
+                
+                # Log progress for large fetches
+                if page_limit is None and current_page % 5 == 0:
+                    self.logger.info(f"Fetched {current_page}/{total_pages} pages, found {len(all_results)} unique movies")
+                
+                # Break if we've reached the last page
+                if current_page >= total_pages:
                     break
+                    
+                # Go to next page
+                current_page += 1
+                
             except requests.RequestException as e:
-                self.logger.error(f"TMDb discover_movies failed: {e}")
+                self.logger.error(f"TMDb discover_movies failed on page {current_page}: {e}")
                 break
+                
+        self.logger.info(f"Completed TMDb discovery with {len(all_results)} unique movies from {current_page} pages")
         return all_results
 
     def get_tmdb_series_collection_details(self, collection_id):

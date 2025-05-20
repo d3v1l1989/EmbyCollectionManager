@@ -114,13 +114,17 @@ def main():
         tmdb_ids = []
         try:
             if recipe['source_type'] == 'tmdb_discover_individual_movies':
-                tmdb_ids = [movie['id'] for movie in tmdb.discover_movies(recipe['tmdb_discover_params'], recipe.get('item_limit'))]
+                # Ignore item_limit to get all available movies
+                tmdb_ids = [movie['id'] for movie in tmdb.discover_movies(recipe['tmdb_discover_params'], None)]
             elif recipe['source_type'] == 'tmdb_series_collection':
                 collection = tmdb.get_tmdb_series_collection_details(recipe['tmdb_collection_id'])
                 tmdb_ids = [part['id'] for part in collection.get('parts', [])]
             else:
                 logger.warning(f"Unknown recipe source_type: {recipe['source_type']}")
                 continue
+            
+            # Ensure tmdb_ids are unique to avoid duplicates
+            tmdb_ids = list(dict.fromkeys(tmdb_ids))  # Preserves order while removing duplicates
         except Exception as e:
             logger.error(f"Failed to fetch TMDb IDs for recipe '{recipe['name']}': {e}")
             continue
@@ -215,13 +219,17 @@ def _sync_collection(server_client, collection_name, tmdb_ids):
         if not owned_item_ids:
             logger.warning(f"    No owned items found for collection '{collection_name}'")
             return collection_id  # Still return the ID for artwork updates
+        
+        # Ensure no duplicate item IDs
+        unique_item_ids = list(dict.fromkeys(owned_item_ids))
+        if len(unique_item_ids) < len(owned_item_ids):
+            logger.info(f"    Removed {len(owned_item_ids) - len(unique_item_ids)} duplicate items from collection '{collection_name}'")
             
-        success = server_client.update_collection_items(collection_id, owned_item_ids)
+        success = server_client.update_collection_items(collection_id, unique_item_ids)
         if success:
-            logger.info(f"    Updated collection '{collection_name}' with {len(owned_item_ids)} items.")
+            logger.info(f"    Updated collection '{collection_name}' with {len(unique_item_ids)} unique items")
         else:
-            logger.error(f"    Failed to update collection '{collection_name}'.")
-            
+            logger.error(f"    Failed to update collection '{collection_name}'.")            
         return collection_id
     except Exception as e:
         logger.error(f"    Exception during syncing collection '{collection_name}': {e}")
