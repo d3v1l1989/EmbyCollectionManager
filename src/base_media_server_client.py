@@ -25,6 +25,19 @@ class MediaServerClient:
             response = self.session.request(method, url, timeout=15, **kwargs)
             response.raise_for_status()
             return response.json()
+        except requests.exceptions.JSONDecodeError as e:
+            print(f"API response is not valid JSON: {e}")
+            print(f"Response text: {response.text[:200]}")
+            return None
+        except requests.exceptions.HTTPError as e:
+            print(f"API request failed with HTTP error: {e}")
+            print(f"Request URL: {url}")
+            print(f"Request method: {method}")
+            print(f"Request params: {kwargs.get('params')}")
+            print(f"Request JSON: {kwargs.get('json')}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                print(f"Response text: {e.response.text[:200]}")
+            return None
         except requests.RequestException as e:
             print(f"API request failed: {e}")
             return None

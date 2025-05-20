@@ -27,16 +27,32 @@ class EmbyClient(MediaServerClient):
             for item in data['Items']:
                 if item.get('Name', '').lower() == collection_name.lower():
                     return item['Id']
-        # Not found, create collection
-        endpoint = f"/Collections"
-        payload = {
-            'Name': collection_name,
-            'UserId': self.user_id
-        }
-        data = self._make_api_request('POST', endpoint, json=payload)
-        if data and 'Id' in data:
-            return data['Id']
-        return None
+                    
+        # Not found, try to create collection using the alternate endpoint format
+        try:
+            # Trying alternate endpoint for Emby collection creation
+            endpoint = f"/emby/Collections"
+            payload = {
+                'Name': collection_name,
+                'Ids': [],
+                'UserId': self.user_id
+            }
+            print(f"Attempting to create collection '{collection_name}' using endpoint {endpoint}")
+            data = self._make_api_request('POST', endpoint, json=payload)
+            if data and 'Id' in data:
+                return data['Id']
+                
+            # If that failed, try the original endpoint format
+            endpoint = f"/Collections"
+            print(f"Attempting to create collection '{collection_name}' using endpoint {endpoint}")
+            data = self._make_api_request('POST', endpoint, json=payload)
+            if data and 'Id' in data:
+                return data['Id']
+                
+            return None
+        except Exception as e:
+            print(f"Error creating collection '{collection_name}': {e}")
+            return None
 
     def get_library_item_ids_by_tmdb_ids(self, tmdb_ids: List[int]) -> List[str]:
         """
