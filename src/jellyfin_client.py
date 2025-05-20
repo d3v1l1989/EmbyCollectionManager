@@ -291,15 +291,24 @@ class JellyfinClient(MediaServerClient):
                     for item in data['Items']:
                         if 'ProviderIds' in item:
                             provider_ids = item['ProviderIds']
-                            # Check for TMDb ID in any case format
+                            # Flag to track if we found a match for this item
+                            found_match = False
+                            
+                            # Check for TMDb ID in any case format - Requires EXACT match
                             for key in ['Tmdb', 'tmdb', 'TMDB']:
                                 if key in provider_ids and provider_ids[key] in tmdb_str_ids:
+                                    # We found a matching TMDb ID
                                     name = item.get('Name', '(unknown)')
                                     item_id = item['Id']
-                                    print(f"Found match via scan: {name} (ID: {item_id})")
+                                    print(f"Found match via scan: {name} (ID: {item_id}) - TMDb ID: {provider_ids[key]}")
                                     if item_id not in item_ids:  # Avoid duplicates
                                         item_ids.append(item_id)
-                                    break
+                                    found_match = True
+                                    break  # Break out of the key loop once we find a match
+                                    
+                            # No need to check other keys if we already found a match
+                            if found_match:
+                                continue  # Continue to the next item
                     
                     # If we got fewer items than requested, we've reached the end
                     if page_items < page_size:
