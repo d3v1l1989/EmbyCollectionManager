@@ -49,12 +49,33 @@ class EmbyClient(MediaServerClient):
                         return item['Id']
             
             # Collection doesn't exist, try creating it with a simpler approach
+            # First try to get the root folder ID for boxsets
+            params = {
+                'ParentId': '0',
+                'IsFolders': 'true',
+                'Fields': 'Name,Path'
+            }
+            endpoint = f"/Users/{self.user_id}/Items"
+            print(f"Looking for boxset parent folder...")
+            root_data = self._make_api_request('GET', endpoint, params=params)
+            parent_id = None
+            if root_data and 'Items' in root_data:
+                for item in root_data['Items']:
+                    if item.get('Name', '').lower() in ['boxsets', 'collections']:
+                        parent_id = item['Id']
+                        print(f"Found parent folder for boxsets: {item['Name']} (ID: {parent_id})")
+                        break
+                    
+            # Now try to create the collection
             endpoint = f"/emby/Collections"
             payload = {
                 'Name': collection_name,
-                'IsLocked': True,
-                'ParentId': '7e64e319657a9516ec78490da03edccb'  # This is typically the root folder ID for boxsets
+                'IsLocked': True
             }
+            
+            # Only add ParentId if we found a valid one
+            if parent_id:
+                payload['ParentId'] = parent_id
             print(f"Attempting to create collection '{collection_name}' using simplified approach")
             data = self._make_api_request('POST', endpoint, json=payload)
             if data and 'Id' in data:
