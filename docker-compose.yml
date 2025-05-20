@@ -8,5 +8,7 @@ services:
       - ./config:/app/config:ro
     env_file:
       - .env
+    # Choose which server(s) to sync by editing the command below:
+    #   --sync_emby for Emby, --sync_jellyfin for Jellyfin, or both
     command: ["--sync_emby", "--sync_jellyfin"]
     restart: unless-stopped
