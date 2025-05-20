@@ -25,6 +25,19 @@ TMDbCollector is a Python application that automatically generates and syncs mov
 - **YAML**: Edit `config/config.yaml` with your API keys and server info.
 - **.env**: Optionally use a `.env` file for secrets (see `.env.example`).
 
+### Example .env file
+Copy `.env.example` to `.env` and fill in your values:
+
+```env
+TMDB_API_KEY=your_tmdb_api_key
+EMBY_API_KEY=your_emby_api_key
+EMBY_URL=http://localhost:8096
+EMBY_USER_ID=your_emby_user_id
+JELLYFIN_API_KEY=your_jellyfin_api_key
+JELLYFIN_URL=http://localhost:8096
+JELLYFIN_USER_ID=your_jellyfin_user_id
+```
+
 ## Docker Compose (Recommended)
 
 The easiest way to run TMDbCollector is with Docker Compose. This will automatically pull the latest image from GitHub Container Registry and run it with your configuration.
