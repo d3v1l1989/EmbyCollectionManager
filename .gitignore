@@ -1,0 +1,7 @@
+__pycache__/
+.env
+config/config.yaml
+*.pyc
+PLANNING.md
+TASK.md
+src/generate_*recipes*.py
