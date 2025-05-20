@@ -370,11 +370,31 @@ class JellyfinClient(MediaServerClient):
             # Format items as payload for Jellyfin API
             payload = deduplicated_ids
             
-            # For large collections, break into smaller batches
-            # to avoid URL length limits and server-side constraints
-            max_batch_size = 20
+            # Try adding all items at once first (like Emby does)
+            # Only fall back to batching if needed
             success = True
             total_added = 0
+            
+            # First, try adding all items at once (with less error reporting to keep logs clean)
+            try:
+                all_ids_str = ','.join(deduplicated_ids)
+                all_url = f"{self.server_url}{endpoint}?api_key={self.api_key}"
+                print(f"First trying to add all {len(deduplicated_ids)} items at once...")
+                
+                params = {'ids': all_ids_str}
+                response = self.session.post(all_url, params=params, timeout=30)  # Longer timeout for large requests
+                
+                if response.status_code in [200, 204]:
+                    print(f"Successfully added all {len(deduplicated_ids)} items to collection at once!")
+                    return True
+                else:
+                    print(f"Adding all items at once failed with HTTP {response.status_code}. Falling back to batch processing...")
+            except Exception as e:
+                print(f"Exception when adding all items at once: {e}")
+                print("Falling back to batch processing...")
+            
+            # Fall back to batch processing if the first approach fails
+            max_batch_size = 100  # Larger batch size than before
             
             # Process items in batches
             for i in range(0, len(deduplicated_ids), max_batch_size):
