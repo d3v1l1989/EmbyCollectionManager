@@ -201,41 +201,94 @@ class JellyfinClient(MediaServerClient):
         total_to_find = len(tmdb_ids)
         print(f"Searching for {total_to_find} movies in Jellyfin library by TMDb IDs")
         
-        # Define batch size to prevent too long URLs
-        batch_size = 50
+        # Define batch size for TMDb ID search
+        # Jellyfin API appears to have a hard limit of 50 items per query
+        batch_size = 50  # Keep at 50 as Jellyfin seems to limit results to 50 per query
+        
+        # Track TMDb IDs that have been searched
+        searched_tmdb_ids = set()
         
         # First try the batched approach with AnyProviderIdEquals
         try:
             # Convert all TMDb IDs to strings and add 'tmdb.' prefix
-            tmdb_id_strings = [f"tmdb.{tmdb_id}" for tmdb_id in tmdb_ids]
+            # Process in much smaller batches to overcome the 50-item return limit
+            search_batch_size = 25  # Search fewer TMDb IDs per batch to get more total matches
+            max_batches = min(50, (len(tmdb_ids) + search_batch_size - 1) // search_batch_size)  # Process more batches but limit to reasonable number
             
-            # Process in batches to avoid URL length limits
-            for i in range(0, len(tmdb_id_strings), batch_size):
-                batch = tmdb_id_strings[i:i+batch_size]
-                provider_ids_str = ",".join(batch)
+            # Track which TMDb IDs we've processed to avoid duplicates
+            processed_count = 0
+            progress_report_interval = max(1, max_batches // 10)  # Report progress at regular intervals
+            
+            # For large collections, we need to process many batches
+            print(f"Processing up to {max_batches} batches with {search_batch_size} TMDb IDs per batch")
+            
+            for batch_idx in range(max_batches):
+                # Get the next batch of TMDb IDs to search for
+                start_idx = batch_idx * search_batch_size
+                end_idx = min(start_idx + search_batch_size, len(tmdb_ids))
+                batch_tmdb_ids = tmdb_ids[start_idx:end_idx]
                 
+                if not batch_tmdb_ids:  # No more TMDb IDs to process
+                    break
+                    
+                # Add these IDs to the set of searched IDs
+                for tmdb_id in batch_tmdb_ids:
+                    searched_tmdb_ids.add(str(tmdb_id))
+                
+                # Format the provider IDs string
+                tmdb_id_strings = [f"tmdb.{tmdb_id}" for tmdb_id in batch_tmdb_ids]
+                provider_ids_str = ",".join(tmdb_id_strings)
+                
+                # Only report progress at intervals for large batches
+                if batch_idx % progress_report_interval == 0 or batch_idx == max_batches - 1:
+                    print(f"Searching batch {batch_idx + 1}/{max_batches} with {len(batch_tmdb_ids)} TMDb IDs")
+                    
                 params = {
                     'Recursive': 'true',
                     'IncludeItemTypes': 'Movie',
                     'Fields': 'ProviderIds,Path',
                     'AnyProviderIdEquals': provider_ids_str,
-                    'Limit': batch_size
+                    'Limit': 100  # Request more items than we expect to get
                 }
                 
                 endpoint = f"/Users/{self.user_id}/Items"
-                print(f"Searching batch {i//batch_size + 1} with {len(batch)} TMDb IDs")
+                
+                # Make the API request to search for movies with these TMDb IDs
                 data = self._make_api_request('GET', endpoint, params=params)
                 
                 if data and 'Items' in data and data['Items']:
                     batch_matches = len(data['Items'])
-                    print(f"Found {batch_matches} matches in batch {i//batch_size + 1}")
                     
+                    # Track batch progress for larger collections
+                    processed_count += len(batch_tmdb_ids)
+                    progress_pct = (processed_count / len(tmdb_ids)) * 100 if tmdb_ids else 0
+                    
+                    # Only report detailed results for significant batches
+                    if batch_idx % progress_report_interval == 0 or batch_idx == max_batches - 1 or batch_matches > 0:
+                        print(f"Found {batch_matches} matches in batch {batch_idx + 1}/{max_batches} ({progress_pct:.1f}% complete)")
+                    
+                    # Track how many new movies we find with each batch
+                    new_in_batch = 0
+                    
+                    # Process the matches
                     for item in data['Items']:
                         name = item.get('Name', '(unknown)')
                         item_id = item['Id']
-                        print(f"  - Found match: {name} (ID: {item_id})")
+                        
+                        # Only add the item if we haven't already found it
                         if item_id not in item_ids:  # Avoid duplicates
                             item_ids.append(item_id)
+                            new_in_batch += 1
+                            
+                            # Only log individual items for smaller collections or initial batches
+                            if len(item_ids) < 100 or batch_idx < 2:  # Limit logging for very large collections
+                                print(f"  - Found match: {name} (ID: {item_id})")
+                    
+                    # Report how many new items were found in this batch
+                    if new_in_batch > 0 and (len(item_ids) >= 100 and batch_idx >= 2):
+                        print(f"  - Found {new_in_batch} new matches in this batch (total so far: {len(item_ids)})")
+                elif batch_idx % progress_report_interval == 0 or batch_idx == max_batches - 1:
+                    print(f"No matches found in batch {batch_idx + 1}/{max_batches}")
         except Exception as e:
             print(f"Error searching by batched provider IDs: {e}")
         
