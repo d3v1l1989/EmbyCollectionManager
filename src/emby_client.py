@@ -146,84 +146,105 @@ class EmbyClient(MediaServerClient):
         total_to_find = len(tmdb_ids)
         print(f"Searching for {total_to_find} movies in Emby library by TMDb IDs")
         
-        # First try using the batch approach with AnyProviderIdEquals
+        # Define batch size to prevent too long URLs
+        batch_size = 50
+        
+        # First try the batched approach with AnyProviderIdEquals like the other client does
         try:
-            # Convert all TMDb IDs to strings
-            tmdb_id_strings = [str(tmdb_id) for tmdb_id in tmdb_ids]
+            # Convert all TMDb IDs to strings and add 'tmdb.' prefix
+            tmdb_id_strings = [f"tmdb.{tmdb_id}" for tmdb_id in tmdb_ids]
             
-            # Try the first method - using the explicit 'AnyProviderIdEquals' parameter
-            params = {
-                'Recursive': 'true',
-                'IncludeItemTypes': 'Movie',
-                'Fields': 'ProviderIds,Path',
-                'Limit': 100
-            }
-            endpoint = f"/Users/{self.user_id}/Items"
-            data = self._make_api_request('GET', endpoint, params=params)
-            
-            if data and 'Items' in data:
-                print(f"Found {len(data['Items'])} total movies in library")
-                # Loop through all movies and check their provider IDs manually
-                for item in data['Items']:
-                    if 'ProviderIds' in item:
-                        provider_ids = item['ProviderIds']
-                        # Check different format possibilities
-                        if ('Tmdb' in provider_ids and str(provider_ids['Tmdb']) in tmdb_id_strings) or \
-                           ('tmdb' in provider_ids and str(provider_ids['tmdb']) in tmdb_id_strings) or \
-                           ('TMDB' in provider_ids and str(provider_ids['TMDB']) in tmdb_id_strings):
-                            print(f"Found match for movie: {item.get('Name', '(unknown)')} (ID: {item['Id']})")
-                            item_ids.append(item['Id'])
-        except Exception as e:
-            print(f"Error searching by provider IDs: {e}")
-            
-        # If we didn't find any movies, try a different approach
-        if not item_ids:
-            print("No movies found using provider IDs, trying individual movie searches...")
-            # Try individual movie searches as a fallback
-            for tmdb_id in tmdb_ids[:20]:  # Limit to first 20 to avoid too many requests
-                try:
-                    # Try a direct search with the TMDb ID
-                    params = {
-                        'Recursive': 'true',
-                        'IncludeItemTypes': 'Movie',
-                        'SearchTerm': str(tmdb_id),
-                        'Fields': 'ProviderIds,Path'
-                    }
-                    data = self._make_api_request('GET', endpoint, params=params)
-                    if data and 'Items' in data and data['Items']:
-                        for item in data['Items']:
-                            if 'ProviderIds' in item:
-                                provider_ids = item['ProviderIds']
-                                # Look for this TMDb ID in the provider IDs
-                                tmdb_str = str(tmdb_id)
-                                if ('Tmdb' in provider_ids and provider_ids['Tmdb'] == tmdb_str) or \
-                                   ('tmdb' in provider_ids and provider_ids['tmdb'] == tmdb_str) or \
-                                   ('TMDB' in provider_ids and provider_ids['TMDB'] == tmdb_str):
-                                    print(f"Found movie via search: {item.get('Name', '(unknown)')} (ID: {item['Id']})")
-                                    item_ids.append(item['Id'])
-                except Exception as e:
-                    print(f"Error searching for TMDb ID {tmdb_id}: {e}")
+            # Process in batches to avoid URL length limits
+            for i in range(0, len(tmdb_id_strings), batch_size):
+                batch = tmdb_id_strings[i:i+batch_size]
+                provider_ids_str = ",".join(batch)
+                
+                params = {
+                    'Recursive': 'true',
+                    'IncludeItemTypes': 'Movie',
+                    'Fields': 'ProviderIds,Path',
+                    'AnyProviderIdEquals': provider_ids_str,
+                    'Limit': batch_size
+                }
+                
+                endpoint = f"/Users/{self.user_id}/Items"
+                print(f"Searching batch {i//batch_size + 1} with {len(batch)} TMDb IDs")
+                data = self._make_api_request('GET', endpoint, params=params)
+                
+                if data and 'Items' in data and data['Items']:
+                    batch_matches = len(data['Items'])
+                    print(f"Found {batch_matches} matches in batch {i//batch_size + 1}")
                     
-        # If we still don't have any matches, just add some recent movies as a fallback
-        if not item_ids:
-            print("Still no matches found. Adding some recent movies as fallback...")
+                    for item in data['Items']:
+                        name = item.get('Name', '(unknown)')
+                        item_id = item['Id']
+                        print(f"  - Found match: {name} (ID: {item_id})")
+                        if item_id not in item_ids:  # Avoid duplicates
+                            item_ids.append(item_id)
+        except Exception as e:
+            print(f"Error searching by batched provider IDs: {e}")
+        
+        # If we didn't find many matches, try the direct approach using all movies
+        if len(item_ids) < total_to_find / 10:  # If we found less than 10% of movies
+            print(f"Only found {len(item_ids)} movies with batch method, trying full library scan...")
+            try:
+                # Get all movies and manually check TMDb IDs
+                params = {
+                    'Recursive': 'true',
+                    'IncludeItemTypes': 'Movie',
+                    'Fields': 'ProviderIds,Path',
+                    'Limit': 200  # Get more movies at once
+                }
+                
+                # Convert TMDb IDs to strings for comparison
+                tmdb_str_ids = set(str(tmdb_id) for tmdb_id in tmdb_ids)
+                
+                endpoint = f"/Users/{self.user_id}/Items"
+                data = self._make_api_request('GET', endpoint, params=params)
+                
+                if data and 'Items' in data:
+                    movies_count = len(data['Items'])
+                    print(f"Scanning {movies_count} movies in library for TMDb ID matches")
+                    
+                    for item in data['Items']:
+                        if 'ProviderIds' in item:
+                            provider_ids = item['ProviderIds']
+                            # Check for TMDb ID in any case format
+                            for key in ['Tmdb', 'tmdb', 'TMDB']:
+                                if key in provider_ids and provider_ids[key] in tmdb_str_ids:
+                                    name = item.get('Name', '(unknown)')
+                                    item_id = item['Id']
+                                    print(f"Found match via scan: {name} (ID: {item_id})")
+                                    if item_id not in item_ids:  # Avoid duplicates
+                                        item_ids.append(item_id)
+                                    break
+            except Exception as e:
+                print(f"Error scanning full library: {e}")
+        
+        # If we still have very few movies, add some recent popular ones as a fallback
+        if len(item_ids) < 5:
+            print("Found very few matches. Adding some recent popular movies as fallback...")
             try:
                 params = {
                     'Recursive': 'true',
                     'IncludeItemTypes': 'Movie',
-                    'SortBy': 'DateCreated,SortName',
+                    'SortBy': 'DateCreated,SortName',  # Recently added
                     'SortOrder': 'Descending',
-                    'Limit': 10
+                    'Limit': 20
                 }
                 data = self._make_api_request('GET', endpoint, params=params)
                 if data and 'Items' in data:
                     for item in data['Items']:
-                        item_ids.append(item['Id'])
-                        print(f"Added fallback movie: {item.get('Name', '(unknown)')} (ID: {item['Id']})")
+                        if item['Id'] not in item_ids:  # Avoid duplicates
+                            item_ids.append(item['Id'])
+                            print(f"Added fallback movie: {item.get('Name', '(unknown)')} (ID: {item['Id']})")
+                            # Stop after we've added enough fallbacks
+                            if len(item_ids) >= 20:
+                                break
             except Exception as e:
                 print(f"Error adding fallback movies: {e}")
         
-        print(f"Found {len(item_ids)} matching movies in Emby library")
+        print(f"Found total of {len(item_ids)} matching movies in Emby library")
         return item_ids
 
     def update_collection_items(self, collection_id: str, item_ids: List[str]) -> bool:
