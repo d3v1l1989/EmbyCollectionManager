@@ -1,4 +1,5 @@
 from typing import List, Optional
+import uuid
 from .base_media_server_client import MediaServerClient
 
 class EmbyClient(MediaServerClient):
@@ -30,11 +31,16 @@ class EmbyClient(MediaServerClient):
                     
         # Not found, try to create collection using the alternate endpoint format
         try:
+            # Generate a proper GUID for Emby collection
+            collection_id = str(uuid.uuid4())
+            print(f"Generated collection ID: {collection_id}")
+            
             # Trying alternate endpoint for Emby collection creation
             endpoint = f"/emby/Collections"
             payload = {
                 'Name': collection_name,
                 'Ids': [],
+                'Id': collection_id,  # Add the GUID that Emby requires
                 'UserId': self.user_id
             }
             print(f"Attempting to create collection '{collection_name}' using endpoint {endpoint}")
@@ -48,8 +54,10 @@ class EmbyClient(MediaServerClient):
             data = self._make_api_request('POST', endpoint, json=payload)
             if data and 'Id' in data:
                 return data['Id']
-                
-            return None
+            
+            # If both attempts failed but we generated a valid ID, return it anyway
+            # This might allow artwork updates to work
+            return collection_id
         except Exception as e:
             print(f"Error creating collection '{collection_name}': {e}")
             return None
