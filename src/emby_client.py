@@ -77,3 +77,53 @@ class EmbyClient(MediaServerClient):
         if data is not None:
             return True
         return False
+        
+    def update_collection_artwork(self, collection_id: str, poster_url: Optional[str]=None, backdrop_url: Optional[str]=None) -> bool:
+        """
+        Update artwork for an Emby collection using external image URLs.
+        
+        Args:
+            collection_id: The Emby collection ID
+            poster_url: URL to collection poster image
+            backdrop_url: URL to collection backdrop/fanart image
+            
+        Returns:
+            True if at least one image was successfully updated, False otherwise
+        """
+        success = False
+        
+        if not collection_id:
+            return False
+            
+        # Update poster if provided
+        if poster_url:
+            try:
+                # First inform Emby about the image URL
+                endpoint = f"/Items/{collection_id}/RemoteImages/Download"
+                params = {
+                    "Type": "Primary",  # Primary = poster in Emby
+                    "ImageUrl": poster_url,
+                    "ProviderName": "TMDb"
+                }
+                data = self._make_api_request('POST', endpoint, params=params)
+                if data is not None:
+                    success = True
+            except Exception as e:
+                print(f"Error updating collection poster: {e}")
+                
+        # Update backdrop if provided
+        if backdrop_url:
+            try:
+                endpoint = f"/Items/{collection_id}/RemoteImages/Download"
+                params = {
+                    "Type": "Backdrop",  # Backdrop/fanart
+                    "ImageUrl": backdrop_url,
+                    "ProviderName": "TMDb"
+                }
+                data = self._make_api_request('POST', endpoint, params=params)
+                if data is not None:
+                    success = True
+            except Exception as e:
+                print(f"Error updating collection backdrop: {e}")
+                
+        return success

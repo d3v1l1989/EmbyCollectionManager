@@ -55,6 +55,16 @@ version: '3.8'
 
 services:
   tmdbcollector:
+    build: .
+    environment:
+      - SYNC_EMBY=1
+      - SYNC_JELLYFIN=1
+      # ...other env vars (TMDB_API_KEY, etc)
+    volumes:
+      - ./config:/app/config
+    # No need to override command or entrypoint
+```
+  tmdbcollector:
     image: ghcr.io/d3v1l1989/tmdbcollector:latest
     container_name: tmdbcollector
     volumes:
@@ -82,28 +92,39 @@ EMBY_USER_ID=your_emby_user_id
 JELLYFIN_API_KEY=your_jellyfin_api_key
 JELLYFIN_URL=http://localhost:8096
 JELLYFIN_USER_ID=your_jellyfin_user_id
-# Choose which server(s) to sync: --sync_emby, --sync_jellyfin, or both (space separated)
-SYNC_TARGETS=--sync_emby
+# Choose which server(s) to sync
+SYNC_TARGET=auto  # Options: auto, emby, jellyfin, all
 ```
 
-- Edit the `SYNC_TARGETS` variable in your `.env` file to control which server(s) to sync to.
-  - For Emby only: `SYNC_TARGETS=--sync_emby`
-  - For Jellyfin only: `SYNC_TARGETS=--sync_jellyfin`
-  - For both: `SYNC_TARGETS=--sync_emby --sync_jellyfin`
+- Set the `SYNC_TARGET` environment variable to control which server(s) to sync to:
+  - `SYNC_TARGET=auto` - Auto-detect and use all configured servers (default)
+  - `SYNC_TARGET=emby` - Sync only to Emby 
+  - `SYNC_TARGET=jellyfin` - Sync only to Jellyfin
+  - `SYNC_TARGET=all` - Sync to both servers (both must be configured)
+
+- Legacy approach (still supported): You can also use `SYNC_EMBY=1` and/or `SYNC_JELLYFIN=1`
 
 ## Docker (Standalone)
 
 You can also run TMDbCollector directly with Docker (without Compose):
 
 1. Make sure you have `config/config.yaml` and `.env` files in your project directory.
-2. Pull the latest image:
+2. Pull/build the latest image:
    ```sh
    docker pull ghcr.io/d3v1l1989/tmdbcollector:latest
+   # or build locally:
+   docker build -t tmdbcollector .
    ```
-3. Run the container:
+3. Run the container (set env vars as needed):
    ```sh
    docker run -d \
      --name tmdbcollector \
+     -e SYNC_TARGET=auto \
+     -v $(pwd)/config:/app/config \
+     tmdbcollector
+   ```
+   - Set SYNC_TARGET to: `auto`, `emby`, `jellyfin`, or `all` as needed
+   - On Windows, replace `$(pwd)` with the full path to your project directory.
      -v $(pwd)/config:/app/config:ro \
      --env-file .env \
      ghcr.io/d3v1l1989/tmdbcollector:latest \
@@ -123,9 +144,14 @@ docker logs -f tmdbcollector
 Run the orchestration CLI from the project root (for manual/advanced use):
 
 ```sh
-python -m src.app_logic --sync_emby --sync_jellyfin
+python -m src.app_logic --targets auto
 ```
-- Use `--sync_emby` and/or `--sync_jellyfin` to target one or both servers.
+- Use `--targets [auto|emby|jellyfin|all]` to control which servers to sync:
+  - `auto`: Auto-detect and use all configured servers (default)
+  - `emby`: Sync only to Emby
+  - `jellyfin`: Sync only to Jellyfin
+  - `all`: Sync to both Emby and Jellyfin (both must be configured)
+- Legacy: You can still use `--sync_emby` and/or `--sync_jellyfin` flags for backward compatibility
 - Use `--config` to specify a custom config file path.
 
 ---

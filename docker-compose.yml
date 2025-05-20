@@ -8,7 +8,8 @@ services:
       - ./config:/app/config:ro
     env_file:
       - .env
-    # The sync target(s) are now controlled via the SYNC_TARGETS variable in your .env file.
-    # Example: SYNC_TARGETS="--sync_emby --sync_jellyfin"
-    command: ["/bin/sh", "-c", "python main.py $SYNC_TARGETS"]
+    # Sync targets are controlled via SYNC_TARGET in your .env file
+    # No need to override the command or entrypoint
+    # environment:
+    #   - SYNC_TARGET=auto  # Options: auto, emby, jellyfin, all
     restart: unless-stopped

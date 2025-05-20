@@ -37,3 +37,17 @@ class MediaServerClient:
 
     def update_collection_items(self, collection_id: str, item_ids: List[str]) -> bool:
         raise NotImplementedError
+        
+    def update_collection_artwork(self, collection_id: str, poster_url: Optional[str]=None, backdrop_url: Optional[str]=None) -> bool:
+        """
+        Update artwork for a collection.
+        
+        Args:
+            collection_id: Media server collection ID
+            poster_url: URL to collection poster image
+            backdrop_url: URL to collection backdrop/fanart image
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        raise NotImplementedError

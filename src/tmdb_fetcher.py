@@ -3,6 +3,7 @@ import logging
 
 class TmdbClient:
     BASE_URL = "https://api.themoviedb.org/3"
+    IMAGE_BASE_URL = "https://image.tmdb.org/t/p"
 
     def __init__(self, api_key):
         self.api_key = api_key
@@ -58,3 +59,43 @@ class TmdbClient:
         except requests.RequestException as e:
             self.logger.error(f"TMDb get_movie_details failed: {e}")
             return None
+            
+    def get_image_url(self, path, size="original"):
+        """
+        Convert a TMDb image path to a full URL.
+        
+        Args:
+            path: Image path from TMDb API (e.g., '/abc123.jpg')
+            size: Image size ('original', 'w500', etc). Default is 'original'
+            
+        Returns:
+            Full image URL or None if path is None/empty
+        """
+        if not path:
+            return None
+        return f"{self.IMAGE_BASE_URL}/{size}{path}"
+
+    def get_artwork_for_collection(self, collection_data):
+        """
+        Extract poster and backdrop URLs from collection data.
+        
+        Args:
+            collection_data: Collection data from TMDb API
+            
+        Returns:
+            Dict with 'poster' and 'backdrop' URLs (may be None)
+        """
+        result = {
+            'poster': None,
+            'backdrop': None
+        }
+        if not collection_data:
+            return result
+            
+        if 'poster_path' in collection_data and collection_data['poster_path']:
+            result['poster'] = self.get_image_url(collection_data['poster_path'])
+            
+        if 'backdrop_path' in collection_data and collection_data['backdrop_path']:
+            result['backdrop'] = self.get_image_url(collection_data['backdrop_path'])
+            
+        return result
