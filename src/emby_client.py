@@ -23,68 +23,80 @@ class EmbyClient(MediaServerClient):
             'Fields': 'Name'
         }
         endpoint = f"/Users/{self.user_id}/Items"
+        print(f"Searching for collection: '{collection_name}'")
         data = self._make_api_request('GET', endpoint, params=params)
         if data and 'Items' in data:
             for item in data['Items']:
                 if item.get('Name', '').lower() == collection_name.lower():
+                    print(f"Found existing collection: {item['Name']} (ID: {item['Id']})")
                     return item['Id']
-                    
-        # Try different approach for stubborn Emby servers
+        
+        # Collection doesn't exist, create it using the method from forum post
+        # https://emby.media/community/index.php?/topic/114883-using-the-collections-api-to-create-a-new-collection/
+        print(f"Collection '{collection_name}' not found. Creating new collection...")
+        
         try:
-            # First do a broader search for the collection
+            # The key insight is to use a POST request to /Collections with empty Ids parameter
+            # This API format follows the successful example from the Emby forum
+            url = f"{self.server_url}/Collections"
+            
+            # Create empty ids list in URL format
+            empty_ids = ""
+            
+            # Prepare the query parameters
             params = {
-                'IncludeItemTypes': 'BoxSet',
-                'Recursive': 'true',
-                'Limit': 100,
-                'Fields': 'Name,Path'
+                'api_key': self.api_key,
+                'IsLocked': 'false',
+                'Name': collection_name,
+                'Ids': empty_ids
             }
-            endpoint = f"/Users/{self.user_id}/Items"
-            print(f"Looking for any existing collections...")
-            data = self._make_api_request('GET', endpoint, params=params)
             
-            # If there are any collections, check if one matches our name
-            if data and 'Items' in data:
-                print(f"Found {len(data['Items'])} existing collections")
-                for item in data['Items']:
-                    # Case-insensitive comparison to find our collection
-                    if item.get('Name', '').lower() == collection_name.lower():
-                        print(f"Found existing collection: {item['Name']} (ID: {item['Id']})")
-                        return item['Id']
-                        
-                # For diagnostic purposes, list all collections
-                print("Available collections:")
-                for item in data['Items'][:5]:  # Just show first 5 to avoid log spam
-                    print(f"  - {item.get('Name', '?')} (ID: {item.get('Id', '?')})")
+            print(f"Using direct POST to /Collections endpoint...")
             
-            # Collection doesn't exist and we can't create it via the API
-            # So we'll use a stable pseudo-ID based on the collection name
-            print(f"Using alternative collection handling method for '{collection_name}'")
+            # Make direct request instead of using the helper to handle URL parameters properly
+            response = self.session.post(url, params=params, timeout=15)
+            response.raise_for_status()
+            
+            # Parse the response
+            try:
+                data = response.json()
+                if data and 'Id' in data:
+                    print(f"Successfully created collection '{collection_name}' with ID: {data['Id']}")
+                    return data['Id']
+            except Exception as e:
+                print(f"Error parsing response: {e}")
+                
+            # If we get here, we couldn't create the collection the standard way
+            # Try the old approach as fallback with different URLs and parameters
+            print(f"Trying fallback methods to create collection...")
+            
+            # Try creating with URL-encoded parameters (different format)
+            try:
+                full_url = f"{self.server_url}/Collections?api_key={self.api_key}&IsLocked=false&Name={collection_name.replace(' ', '%20')}&Ids="
+                print(f"Trying direct URL: {full_url.replace(self.api_key, 'API_KEY_HIDDEN')}")
+                response = self.session.post(full_url, timeout=15)
+                response.raise_for_status()
+                
+                if response.text and len(response.text) > 0:
+                    try:
+                        data = response.json()
+                        if data and 'Id' in data:
+                            print(f"Fallback method worked! Created collection with ID: {data['Id']}")
+                            return data['Id']
+                    except Exception as e:
+                        print(f"Error parsing fallback response: {e}")
+            except Exception as e:
+                print(f"Fallback method failed: {e}")
+            
+            # If all else fails, we'll need a temporary ID to continue
+            print(f"Could not create collection. Using temporary ID for '{collection_name}'")
             import hashlib
             temp_id = hashlib.md5(collection_name.encode()).hexdigest()
-            
-            # Store this as a temporary collection mapping
             self._temp_collections = getattr(self, '_temp_collections', {})
             self._temp_collections[temp_id] = collection_name
-            
-            # Before returning, check if this collection exists - maybe there's a user-created one
-            # We'd need to first use Emby UI to manually create these collections
-            print(f"Checking for manually created collection: '{collection_name}'")
-            params = {
-                'IncludeItemTypes': 'BoxSet',
-                'SearchTerm': collection_name,
-                'Recursive': 'true',
-                'Limit': 10
-            }
-            search_data = self._make_api_request('GET', f"/Users/{self.user_id}/Items", params=params)
-            if search_data and 'Items' in search_data and search_data['Items']:
-                for item in search_data['Items']:
-                    if item.get('Name', '').lower() == collection_name.lower():
-                        real_id = item['Id']
-                        print(f"Found manually created collection: {item['Name']} (ID: {real_id})")
-                        return real_id
-            
-            # No luck - return the pseudo-ID
+            print(f"Using temporary ID: {temp_id}")
             return temp_id
+            
         except Exception as e:
             print(f"Error creating collection '{collection_name}': {e}")
             return None
