@@ -254,8 +254,15 @@ class JellyfinClient(MediaServerClient):
                     'EnableTotalRecordCount': 'true'  # Get total count for pagination
                 }
                 
-                # Convert TMDb IDs to strings for comparison
+                # Convert TMDb IDs to strings for EXACT comparison
+                # Create a set for O(1) lookup but add debug counting
                 tmdb_str_ids = set(str(tmdb_id) for tmdb_id in tmdb_ids)
+                print(f"Looking for {len(tmdb_str_ids)} unique TMDb IDs in library of {total_items} movies")
+                
+                # Add additional debug information 
+                if len(tmdb_str_ids) > 0:
+                    sample_ids = list(tmdb_str_ids)[:5] 
+                    print(f"Sample TMDb IDs we're looking for: {sample_ids}")
                 
                 endpoint = f"/Users/{self.user_id}/Items"
                 
@@ -294,18 +301,32 @@ class JellyfinClient(MediaServerClient):
                             # Flag to track if we found a match for this item
                             found_match = False
                             
-                            # Check for TMDb ID in any case format - Requires EXACT match
+                            # Debug: Check if this item has tmdb provider info
+                            has_tmdb_id = False
+                            jellyfin_tmdb_id = None
+                            
+                            # Check for TMDb ID in any case format - ONLY EXACT STRING MATCHES
                             for key in ['Tmdb', 'tmdb', 'TMDB']:
-                                if key in provider_ids and provider_ids[key] in tmdb_str_ids:
-                                    # We found a matching TMDb ID
-                                    name = item.get('Name', '(unknown)')
-                                    item_id = item['Id']
-                                    print(f"Found match via scan: {name} (ID: {item_id}) - TMDb ID: {provider_ids[key]}")
-                                    if item_id not in item_ids:  # Avoid duplicates
-                                        item_ids.append(item_id)
-                                    found_match = True
-                                    break  # Break out of the key loop once we find a match
+                                if key in provider_ids:
+                                    has_tmdb_id = True
+                                    jellyfin_tmdb_id = str(provider_ids[key])  # Convert to string for comparison
                                     
+                                    # CRITICAL FIX: Use explicit set membership test on the exact string
+                                    if jellyfin_tmdb_id in tmdb_str_ids:
+                                        # We found a matching TMDb ID
+                                        name = item.get('Name', '(unknown)')
+                                        item_id = item['Id']
+                                        print(f"Found match via scan: {name} (ID: {item_id}) - TMDb ID: {jellyfin_tmdb_id}")
+                                        if item_id not in item_ids:  # Avoid duplicates
+                                            item_ids.append(item_id)
+                                        found_match = True
+                                        break  # Break out of the key loop once we find a match
+                            
+                            # Debug: If it has TMDb ID but no match, report this for the first few items
+                            if has_tmdb_id and not found_match and len(item_ids) < 100:  # Limit debugging output
+                                name = item.get('Name', '(unknown)')
+                                print(f"Movie has TMDb ID but NOT matched: {name} - TMDb ID: {jellyfin_tmdb_id}")
+                                                            
                             # No need to check other keys if we already found a match
                             if found_match:
                                 continue  # Continue to the next item
