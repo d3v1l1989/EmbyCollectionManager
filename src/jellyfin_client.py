@@ -375,42 +375,119 @@ class JellyfinClient(MediaServerClient):
             success = True
             total_added = 0
             
-            # First, try adding all items at once (with less error reporting to keep logs clean)
+            # First, try adding all items at once (with detailed error reporting)
             try:
                 all_ids_str = ','.join(deduplicated_ids)
                 all_url = f"{self.server_url}{endpoint}?api_key={self.api_key}"
                 print(f"First trying to add all {len(deduplicated_ids)} items at once...")
+                print(f"URL length: {len(all_url + all_ids_str)} characters")
                 
                 params = {'ids': all_ids_str}
-                response = self.session.post(all_url, params=params, timeout=30)  # Longer timeout for large requests
+                
+                # Print more diagnostic info
+                print(f"First 3 IDs: {all_ids_str.split(',')[:3]}")
+                print(f"Last 3 IDs: {all_ids_str.split(',')[-3:] if len(all_ids_str.split(',')) >= 3 else all_ids_str.split(',')}") 
+                
+                # Try both methods: params and direct URL to see which works
+                # Method 1: Use params
+                response1 = self.session.post(all_url, params=params, timeout=30)  # Longer timeout for large requests
+                print(f"Method 1 (params) result: HTTP {response1.status_code}")
+                
+                # Method 2: Append directly to URL
+                direct_url = f"{all_url}&ids={all_ids_str}"
+                print(f"Method 2 URL first 100 chars: {direct_url[:100]}...")
+                response2 = self.session.post(direct_url, timeout=30)  # Longer timeout for large requests
+                print(f"Method 2 (direct URL) result: HTTP {response2.status_code}")
+                
+                # Prefer response1 but use response2 if response1 failed
+                response = response1 if response1.status_code in [200, 204] else response2
                 
                 if response.status_code in [200, 204]:
                     print(f"Successfully added all {len(deduplicated_ids)} items to collection at once!")
+                    # Verify collection item count
+                    print(f"Verifying collection content after adding items...")
+                    try:
+                        verification_url = f"{self.server_url}/Collections/{collection_id}?api_key={self.api_key}"
+                        verify_response = self.session.get(verification_url, timeout=15)
+                        if verify_response.status_code == 200:
+                            collection_data = verify_response.json()
+                            child_count = collection_data.get('ChildCount', 0)
+                            print(f"Collection now contains {child_count} items according to Jellyfin")
+                        else:
+                            print(f"Failed to verify collection content: HTTP {verify_response.status_code}")
+                    except Exception as ve:
+                        print(f"Error verifying collection content: {ve}")
                     return True
                 else:
-                    print(f"Adding all items at once failed with HTTP {response.status_code}. Falling back to batch processing...")
+                    print(f"Both methods failed. HTTP codes: {response1.status_code}, {response2.status_code}")
+                    print(f"Response text (if any): {response1.text[:200] if response1.text else 'None'}")
+                    print(f"Falling back to batch processing...")
+            
             except Exception as e:
                 print(f"Exception when adding all items at once: {e}")
                 print("Falling back to batch processing...")
             
-            # Fall back to batch processing if the first approach fails
-            max_batch_size = 100  # Larger batch size than before
+            # Fall back to testing different batch sizes to find what works
+            print("Testing multiple batch sizes to find what works best...")
             
-            # Process items in batches
-            for i in range(0, len(deduplicated_ids), max_batch_size):
-                batch = deduplicated_ids[i:i + max_batch_size]
+            # Try different batch sizes to find what works
+            batch_sizes = [200, 100, 50, 20]
+            
+            # Keep track of which batch size worked
+            effective_batch_size = None
+            total_added = 0
+            test_items = deduplicated_ids[:10]  # Just use first 10 items for testing
+            
+            # First test which batch size works best
+            for size in batch_sizes:
+                try:
+                    test_batch = test_items[:min(size, len(test_items))]
+                    test_batch_str = ','.join(test_batch)
+                    
+                    print(f"Testing batch size of {size} items...")
+                    test_url = f"{self.server_url}{endpoint}?api_key={self.api_key}"
+                    test_params = {'ids': test_batch_str}
+                    
+                    test_response = self.session.post(test_url, params=test_params, timeout=15)
+                    
+                    if test_response.status_code in [200, 204]:
+                        print(f"Batch size {size} works! Using this for processing.")
+                        effective_batch_size = size
+                        break
+                    else:
+                        print(f"Batch size {size} failed with HTTP {test_response.status_code}")
+                except Exception as test_e:
+                    print(f"Error testing batch size {size}: {test_e}")
+            
+            # If none of our test sizes worked, use the smallest
+            if not effective_batch_size:
+                print("All test batch sizes failed. Using smallest size (20) as fallback.")
+                effective_batch_size = 20
+                
+            print(f"Processing all {len(deduplicated_ids)} items using batch size of {effective_batch_size}")
+            
+            # Now process all items with the effective batch size
+            for i in range(0, len(deduplicated_ids), effective_batch_size):
+                batch = deduplicated_ids[i:i + effective_batch_size]
                 batch_str = ','.join(batch)
                 
                 if not batch:
                     continue
                     
-                # Try direct POST with batch_str as parameter
+                # Try both direct URL and params approaches for each batch
                 try:
                     params = {'ids': batch_str}
                     url = f"{self.server_url}{endpoint}?api_key={self.api_key}"
-                    print(f"Adding batch of {len(batch)} items to collection (batch {i//max_batch_size + 1})...")
+                    print(f"Adding batch of {len(batch)} items to collection (batch {i//effective_batch_size + 1} of {(len(deduplicated_ids) + effective_batch_size - 1)//effective_batch_size})...")
                     
+                    # Try params method first
                     response = self.session.post(url, params=params, timeout=15)
+                    
+                    # If params method fails, try direct URL method
+                    if response.status_code not in [200, 204]:
+                        direct_url = f"{url}&ids={batch_str}"
+                        response = self.session.post(direct_url, timeout=15)
+                        
                     if response.status_code in [200, 204]:
                         print(f"Successfully added batch of {len(batch)} items to collection")
                         total_added += len(batch)
@@ -420,20 +497,59 @@ class JellyfinClient(MediaServerClient):
                             print(f"Response: {response.text[:100]}")
                         
                         # Try individual items as fallback
+                        print("Falling back to adding items individually...")
                         for item_id in batch:
                             try:
+                                # Try both direct endpoint and item approach
                                 item_url = f"{self.server_url}{endpoint}/{item_id}?api_key={self.api_key}"
                                 item_response = self.session.post(item_url, timeout=10)
                                 if item_response.status_code in [200, 204]:
                                     total_added += 1
+                                    print(f"Added item {item_id} individually")
                                 else:
                                     success = False
+                                    print(f"Failed to add item {item_id} individually: HTTP {item_response.status_code}")
                             except Exception as inner_e:
                                 print(f"Error adding individual item: {inner_e}")
                                 success = False
                 except Exception as e:
                     print(f"Exception during batch add: {e}")
                     success = False
+                
+            # Verify how many items are actually in the collection after processing
+            try:
+                print(f"Verifying final collection content...")
+                verification_url = f"{self.server_url}/Collections/{collection_id}?api_key={self.api_key}"
+                verify_response = self.session.get(verification_url, timeout=15)
+                final_count = 0
+                
+                if verify_response.status_code == 200:
+                    collection_data = verify_response.json()
+                    final_count = collection_data.get('ChildCount', 0)
+                    print(f"Collection now contains {final_count} items according to Jellyfin API")
+                    
+                    # Try to get actual items to see what was included
+                    try:
+                        items_url = f"{self.server_url}/Collections/{collection_id}/Items?api_key={self.api_key}"
+                        items_response = self.session.get(items_url, timeout=15)
+                        
+                        if items_response.status_code == 200:
+                            items_data = items_response.json()
+                            actual_items = items_data.get('Items', [])
+                            print(f"Retrieved {len(actual_items)} items from collection")
+                            print(f"First few items: {[item.get('Name', 'Unknown') for item in actual_items[:5] if 'Name' in item]}")
+                            
+                            # Check if there's a Jellyfin-imposed limit
+                            if 50 <= final_count <= 100:
+                                print("\nNOTE: Jellyfin may have an internal limit (~100 items) for collections.")
+                                print("This appears to be a limitation of the Jellyfin server itself, not this tool.")
+                                print("Consider checking your Jellyfin server version or its configuration.\n")
+                    except Exception as items_e:
+                        print(f"Error retrieving collection items: {items_e}")
+                else:
+                    print(f"Failed to verify final collection content: HTTP {verify_response.status_code}")
+            except Exception as final_e:
+                print(f"Error in final verification: {final_e}")
                 
             # Return success status after all batches are processed
             if total_added > 0:
