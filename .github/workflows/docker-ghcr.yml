@@ -38,4 +38,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository }}/tmdbcollector:latest
+          tags: ghcr.io/d3v1l1989/tmdbcollector:latest

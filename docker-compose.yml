@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  tmdbcollector:
+    image: ghcr.io/d3v1l1989/tmdbcollector:latest
+    container_name: tmdbcollector
+    volumes:
+      - ./config:/app/config:ro
+    env_file:
+      - .env
+    command: ["--sync_emby", "--sync_jellyfin"]
+    restart: unless-stopped

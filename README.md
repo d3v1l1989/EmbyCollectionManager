@@ -25,15 +25,48 @@ TMDbCollector is a Python application that automatically generates and syncs mov
 - **YAML**: Edit `config/config.yaml` with your API keys and server info.
 - **.env**: Optionally use a `.env` file for secrets (see `.env.example`).
 
+## Docker Compose (Recommended)
+
+The easiest way to run TMDbCollector is with Docker Compose. This will automatically pull the latest image from GitHub Container Registry and run it with your configuration.
+
+1. Copy `docker-compose.yml` to your project directory (already included in this repo).
+2. Edit `config/config.yaml` and `.env` with your API keys and server details.
+3. Start the service:
+   ```sh
+   docker compose up -d
+   ```
+
+**Example `docker-compose.yml`:**
+```yaml
+version: '3.8'
+
+services:
+  tmdbcollector:
+    image: ghcr.io/d3v1l1989/tmdbcollector:latest
+    container_name: tmdbcollector
+    volumes:
+      - ./config:/app/config:ro
+    env_file:
+      - .env
+    command: ["--sync_emby", "--sync_jellyfin"]
+    restart: unless-stopped
+```
+
+Logs can be viewed with:
+```sh
+docker compose logs -f tmdbcollector
+```
+
+---
+
 ## Usage
-Run the orchestration CLI from the project root:
+Run the orchestration CLI from the project root (for manual/advanced use):
 
 ```sh
 python -m src.app_logic --sync_emby --sync_jellyfin
 ```
 - Use `--sync_emby` and/or `--sync_jellyfin` to target one or both servers.
 - Use `--config` to specify a custom config file path.
-
 
 ---
 
