@@ -60,19 +60,19 @@ class JellyfinClient(MediaServerClient):
                 
                 # Try the standard Jellyfin collection creation endpoint
                 try:
-                    # Jellyfin's collection endpoint
+                    # Use the same approach as Emby - direct URL parameters rather than JSON body
                     encoded_name = quote(collection_name)
-                    url = f"{self.server_url}/Collections"  
                     
-                    # Try both payload formats that might work with Jellyfin
-                    payload = {
-                        'Name': collection_name,
-                        'IsLocked': True,
-                        'Ids': [sample_item_id]  # Include the sample item
-                    }
+                    # Format: /Collections?api_key=XXX&IsLocked=true&Name=CollectionName&Ids=123456
+                    # This follows the exact same pattern that works for Emby
+                    full_url = f"{self.server_url}/Collections?api_key={self.api_key}&IsLocked=true&Name={encoded_name}&Ids={sample_item_id}"
+                    print(f"Creating collection using URL parameters...")
                     
-                    print(f"Creating collection with sample item...")
-                    response = self.session.post(f"{url}?api_key={self.api_key}", json=payload, timeout=15)
+                    # Don't print the full URL with API key
+                    print(f"URL (API key hidden): {full_url.replace(self.api_key, 'API_KEY_HIDDEN')}")
+                    
+                    # Make a direct POST request without a JSON body
+                    response = self.session.post(full_url, timeout=15)
                     
                     if response.status_code in [200, 201, 204] and response.text:
                         try:
@@ -101,24 +101,83 @@ class JellyfinClient(MediaServerClient):
                     print(f"Error creating collection with sample item: {e}")
             
             # Alternative method without a sample item
+                try:
+                    print(f"Trying alternative collection creation method...")
+                    
+                    # Try the more compatible /Library/Collections endpoint approach
+                    # This is a special endpoint in some Jellyfin versions
+                    endpoint = f"/Library/Collections"
+                    payload = {
+                        'Name': collection_name,
+                        'IsLocked': True,
+                        'Type': 'boxset'
+                    }
+                    
+                    # Try with direct session post first
+                    try:
+                        url = f"{self.server_url}{endpoint}?api_key={self.api_key}"
+                        print(f"Trying Library/Collections endpoint...")
+                        response = self.session.post(url, json=payload, timeout=15)
+                        
+                        if response.status_code in [200, 201, 204] and response.text:
+                            try:
+                                data = response.json()
+                                if data and 'Id' in data:
+                                    print(f"Successfully created Jellyfin collection via Library endpoint with ID: {data['Id']}")
+                                    return data['Id']
+                            except:
+                                pass
+                    except Exception as e:
+                        print(f"Library/Collections endpoint failed: {e}")
+                    
+                    # Try another alternative endpoint used by some clients
+                    try:
+                        endpoint = f"/Collections"
+                        payload = {
+                            'Name': collection_name,
+                            'IsLocked': True,
+                            'UserId': self.user_id
+                        }
+                        
+                        data = self._make_api_request('POST', endpoint, json=payload)
+                        if data and 'Id' in data:
+                            print(f"Successfully created Jellyfin collection with ID: {data['Id']}")
+                            return data['Id']
+                    except Exception as e2:
+                        print(f"Standard Collections endpoint failed: {e2}")
+                except Exception as e:
+                    print(f"All alternative collection creation methods failed: {e}")
+            
+            # Try one final method - see if we can find a collection that already exists with a similar name
             try:
-                print(f"Trying alternative collection creation method...")
-                endpoint = f"/Collections"
-                payload = {
-                    'Name': collection_name,
-                    'IsLocked': True,
-                    'UserId': self.user_id
+                print(f"Trying to find similar collection as fallback...")
+                params = {
+                    'IncludeItemTypes': 'BoxSet',
+                    'Recursive': 'true',
+                    'Fields': 'Name'
                 }
+                endpoint = f"/Users/{self.user_id}/Items"
+                data = self._make_api_request('GET', endpoint, params=params)
                 
-                data = self._make_api_request('POST', endpoint, json=payload)
-                if data and 'Id' in data:
-                    print(f"Successfully created Jellyfin collection with ID: {data['Id']}")
-                    return data['Id']
+                if data and 'Items' in data and data['Items']:
+                    # If any collection exists, suggest manual creation but also use first collection as fallback
+                    first_collection = data['Items'][0]
+                    print(f"Found existing collection '{first_collection['Name']}' (ID: {first_collection['Id']})")
+                    print(f"Using this collection as temporary fallback for '{collection_name}'")
+                    print(f"IMPORTANT: Please manually add '{collection_name}' to your collection or create it")
+                    return first_collection['Id']
             except Exception as e:
-                print(f"Alternative collection creation failed: {e}")
+                print(f"Error finding fallback collection: {e}")
             
             # If all creation attempts failed, use a temporary ID
             print(f"All collection creation methods failed for '{collection_name}'")
+            print(f"ERROR: Cannot create collection '{collection_name}' on your Jellyfin server.")
+            print(f"This typically happens when the API user doesn't have sufficient permissions")
+            print(f"or when there are API compatibility issues with your Jellyfin version.")
+            print(f"To fix this:")
+            print(f"1. Ensure your API user has 'Administrator' access")
+            print(f"2. Manually create the collection in Jellyfin's web interface")
+            
             temp_id = hashlib.md5(collection_name.encode()).hexdigest()
             self._temp_collections = getattr(self, '_temp_collections', {})
             self._temp_collections[temp_id] = collection_name
@@ -303,29 +362,69 @@ class JellyfinClient(MediaServerClient):
                 return False
                 
             # Add the deduplicated items to the collection
-            try:
-                endpoint = f"/Collections/{collection_id}/Items"
-                print(f"Adding {len(deduplicated_ids)} unique items to collection {collection_id}")
-                print(f"First few items: {deduplicated_ids[:3] if len(deduplicated_ids) > 3 else deduplicated_ids}")
+            endpoint = f"/Collections/{collection_id}/Items"
+            print(f"Adding {len(deduplicated_ids)} unique items to collection {collection_id}")
+            print(f"First few items: {deduplicated_ids[:3] if len(deduplicated_ids) > 3 else deduplicated_ids}")
+            
+            # Make the API request
+            # Format items as payload for Jellyfin API
+            payload = deduplicated_ids
+            
+            # For large collections, break into smaller batches
+            # to avoid URL length limits and server-side constraints
+            max_batch_size = 20
+            success = True
+            total_added = 0
+            
+            # Process items in batches
+            for i in range(0, len(deduplicated_ids), max_batch_size):
+                batch = deduplicated_ids[i:i + max_batch_size]
+                batch_str = ','.join(batch)
                 
-                # Format items as payload for Jellyfin API
-                payload = deduplicated_ids
+                if not batch:
+                    continue
+                    
+                # Try direct POST with batch_str as parameter
+                try:
+                    params = {'ids': batch_str}
+                    url = f"{self.server_url}{endpoint}?api_key={self.api_key}"
+                    print(f"Adding batch of {len(batch)} items to collection (batch {i//max_batch_size + 1})...")
+                    
+                    response = self.session.post(url, params=params, timeout=15)
+                    if response.status_code in [200, 204]:
+                        print(f"Successfully added batch of {len(batch)} items to collection")
+                        total_added += len(batch)
+                    else:
+                        print(f"Error adding batch to collection: HTTP {response.status_code}")
+                        if response.text:
+                            print(f"Response: {response.text[:100]}")
+                        
+                        # Try individual items as fallback
+                        for item_id in batch:
+                            try:
+                                item_url = f"{self.server_url}{endpoint}/{item_id}?api_key={self.api_key}"
+                                item_response = self.session.post(item_url, timeout=10)
+                                if item_response.status_code in [200, 204]:
+                                    total_added += 1
+                                else:
+                                    success = False
+                            except Exception as inner_e:
+                                print(f"Error adding individual item: {inner_e}")
+                                success = False
+                except Exception as e:
+                    print(f"Exception during batch add: {e}")
+                    success = False
                 
-                # Make the API request
-                data = self._make_api_request('POST', endpoint, json=payload)
-                if data is not None:
-                    print(f"Successfully added {len(deduplicated_ids)} unique items to Jellyfin collection")
-                    return True
-                else:
-                    print("Failed to add items to collection")
-                    return False
-            except Exception as e:
-                print(f"Error adding items to collection: {e}")
-                return False
+            # Return success status after all batches are processed
+            if total_added > 0:
+                print(f"Successfully added {total_added} of {len(deduplicated_ids)} items to collection")
+                return True
+            return success
+            
         except Exception as e:
-            print(f"Error during collection update: {e}")
+            logger.error(f"Error adding item to collection: {e}")
             return False
-        
+    
     def update_collection_artwork(self, collection_id: str, poster_url: Optional[str]=None, backdrop_url: Optional[str]=None) -> bool:
         """
         Update artwork for a Jellyfin collection using external image URLs.
@@ -771,19 +870,29 @@ class JellyfinClient(MediaServerClient):
             endpoint = f"/Collections/{collection_id}/Items"
             params = {'ids': item_id}
             
-            response = self.session.post(
-                f"{self.server_url}{endpoint}?api_key={self.api_key}",
-                params=params,
-                timeout=15
-            )
-            
-            if response.status_code in [200, 204]:
-                logger.info(f"Successfully added '{title}' to collection")
-                return True
-            else:
-                logger.error(f"Failed to add item to collection: HTTP {response.status_code}")
-                if response.text:
-                    logger.error(f"Response: {response.text[:200]}")
+            try:
+                # Try standard POST request first
+                url = f"{self.server_url}{endpoint}?api_key={self.api_key}"
+                logger.info(f"Adding '{title}' to collection...")
+                response = self.session.post(url, params=params, timeout=15)
+                
+                if response.status_code in [200, 204]:
+                    logger.info(f"Successfully added '{title}' to collection")
+                    return True
+                else:
+                    # If that fails, try the item-specific endpoint as fallback
+                    item_url = f"{self.server_url}{endpoint}/{item_id}?api_key={self.api_key}"
+                    item_response = self.session.post(item_url, timeout=10)
+                    if item_response.status_code in [200, 204]:
+                        logger.info(f"Successfully added '{title}' to collection via item-specific endpoint")
+                        return True
+                    else:
+                        logger.error(f"Failed to add item to collection: HTTP {response.status_code}")
+                        if response.text:
+                            logger.error(f"Response: {response.text[:200]}")
+                        return False
+            except Exception as e:
+                logger.error(f"Error adding item to collection: {e}")
                 return False
                 
         except Exception as e:
