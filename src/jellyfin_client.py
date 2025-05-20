@@ -425,12 +425,10 @@ class JellyfinClient(MediaServerClient):
         print(f"Batch processing complete. Found {len(item_ids)} total unique movies across all batches.")
         
         # Only use the library scan as a fallback if we found a very small percentage of what we expected
-        if len(item_ids) < 200 and total_to_find > 500 and (len(item_ids) < total_to_find / 20):  # Very low match rate
+        # Always do a full library scan if we found less than 20% of the expected matches
+        if len(item_ids) < total_to_find / 5:  # Less than 20% match rate
             print(f"Only found {len(item_ids)} movies with batch method (out of {total_to_find} TMDb IDs), trying full library scan...")
-        else:
-            # We have a reasonable number of matches from batch method, skip the full scan
-            print(f"Batch method found {len(item_ids)} movies, which is sufficient. Skipping full library scan.")
-            return item_ids
+            
             try:
                 # Get all movies and manually check TMDb IDs
                 # We need to paginate to get ALL movies in the library
@@ -562,6 +560,10 @@ class JellyfinClient(MediaServerClient):
                                             break
                 except Exception as simple_e:
                     print(f"Simple library scan also failed: {simple_e}")
+        else:
+            # We have a reasonable number of matches from batch method, skip the full scan
+            print(f"Batch method found {len(item_ids)} movies, which is sufficient. Skipping full library scan.")
+            return item_ids
         
         # If we still have very few movies, add some recent popular ones as a fallback
         if len(item_ids) < 5:
