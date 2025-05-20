@@ -59,6 +59,34 @@ docker compose logs -f tmdbcollector
 
 ---
 
+## Docker (Standalone)
+
+You can also run TMDbCollector directly with Docker (without Compose):
+
+1. Make sure you have `config/config.yaml` and `.env` files in your project directory.
+2. Pull the latest image:
+   ```sh
+   docker pull ghcr.io/d3v1l1989/tmdbcollector:latest
+   ```
+3. Run the container:
+   ```sh
+   docker run -d \
+     --name tmdbcollector \
+     -v $(pwd)/config:/app/config:ro \
+     --env-file .env \
+     ghcr.io/d3v1l1989/tmdbcollector:latest \
+     --sync_emby --sync_jellyfin
+   ```
+   - Adjust the command-line arguments (`--sync_emby`, `--sync_jellyfin`) as needed.
+   - On Windows, replace `$(pwd)` with the full path to your project directory.
+
+Logs can be viewed with:
+```sh
+docker logs -f tmdbcollector
+```
+
+---
+
 ## Usage
 Run the orchestration CLI from the project root (for manual/advanced use):
 
