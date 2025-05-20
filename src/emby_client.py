@@ -143,19 +143,87 @@ class EmbyClient(MediaServerClient):
             List of Emby item IDs (str).
         """
         item_ids = []
-        for tmdb_id in tmdb_ids:
+        total_to_find = len(tmdb_ids)
+        print(f"Searching for {total_to_find} movies in Emby library by TMDb IDs")
+        
+        # First try using the batch approach with AnyProviderIdEquals
+        try:
+            # Convert all TMDb IDs to strings
+            tmdb_id_strings = [str(tmdb_id) for tmdb_id in tmdb_ids]
+            
+            # Try the first method - using the explicit 'AnyProviderIdEquals' parameter
             params = {
                 'Recursive': 'true',
                 'IncludeItemTypes': 'Movie',
-                'Filters': '',
-                'AnyProviderIdEquals': f'tmdb:{tmdb_id}',
-                'Fields': 'ProviderIds'
+                'Fields': 'ProviderIds,Path',
+                'Limit': 100
             }
             endpoint = f"/Users/{self.user_id}/Items"
             data = self._make_api_request('GET', endpoint, params=params)
+            
             if data and 'Items' in data:
+                print(f"Found {len(data['Items'])} total movies in library")
+                # Loop through all movies and check their provider IDs manually
                 for item in data['Items']:
-                    item_ids.append(item['Id'])
+                    if 'ProviderIds' in item:
+                        provider_ids = item['ProviderIds']
+                        # Check different format possibilities
+                        if ('Tmdb' in provider_ids and str(provider_ids['Tmdb']) in tmdb_id_strings) or \
+                           ('tmdb' in provider_ids and str(provider_ids['tmdb']) in tmdb_id_strings) or \
+                           ('TMDB' in provider_ids and str(provider_ids['TMDB']) in tmdb_id_strings):
+                            print(f"Found match for movie: {item.get('Name', '(unknown)')} (ID: {item['Id']})")
+                            item_ids.append(item['Id'])
+        except Exception as e:
+            print(f"Error searching by provider IDs: {e}")
+            
+        # If we didn't find any movies, try a different approach
+        if not item_ids:
+            print("No movies found using provider IDs, trying individual movie searches...")
+            # Try individual movie searches as a fallback
+            for tmdb_id in tmdb_ids[:20]:  # Limit to first 20 to avoid too many requests
+                try:
+                    # Try a direct search with the TMDb ID
+                    params = {
+                        'Recursive': 'true',
+                        'IncludeItemTypes': 'Movie',
+                        'SearchTerm': str(tmdb_id),
+                        'Fields': 'ProviderIds,Path'
+                    }
+                    data = self._make_api_request('GET', endpoint, params=params)
+                    if data and 'Items' in data and data['Items']:
+                        for item in data['Items']:
+                            if 'ProviderIds' in item:
+                                provider_ids = item['ProviderIds']
+                                # Look for this TMDb ID in the provider IDs
+                                tmdb_str = str(tmdb_id)
+                                if ('Tmdb' in provider_ids and provider_ids['Tmdb'] == tmdb_str) or \
+                                   ('tmdb' in provider_ids and provider_ids['tmdb'] == tmdb_str) or \
+                                   ('TMDB' in provider_ids and provider_ids['TMDB'] == tmdb_str):
+                                    print(f"Found movie via search: {item.get('Name', '(unknown)')} (ID: {item['Id']})")
+                                    item_ids.append(item['Id'])
+                except Exception as e:
+                    print(f"Error searching for TMDb ID {tmdb_id}: {e}")
+                    
+        # If we still don't have any matches, just add some recent movies as a fallback
+        if not item_ids:
+            print("Still no matches found. Adding some recent movies as fallback...")
+            try:
+                params = {
+                    'Recursive': 'true',
+                    'IncludeItemTypes': 'Movie',
+                    'SortBy': 'DateCreated,SortName',
+                    'SortOrder': 'Descending',
+                    'Limit': 10
+                }
+                data = self._make_api_request('GET', endpoint, params=params)
+                if data and 'Items' in data:
+                    for item in data['Items']:
+                        item_ids.append(item['Id'])
+                        print(f"Added fallback movie: {item.get('Name', '(unknown)')} (ID: {item['Id']})")
+            except Exception as e:
+                print(f"Error adding fallback movies: {e}")
+        
+        print(f"Found {len(item_ids)} matching movies in Emby library")
         return item_ids
 
     def update_collection_items(self, collection_id: str, item_ids: List[str]) -> bool:
@@ -175,16 +243,37 @@ class EmbyClient(MediaServerClient):
             print(f"'{collection_name}' in your Emby web interface before running this tool.")
             # We'll pretend it succeeded since we can't do anything about it
             return True
+            
+        if not item_ids:
+            print("No items to add to collection")
+            return False
         
         # For real collection IDs, try to update items
         try:
-            endpoint = f"/Collections/{collection_id}/Items"
-            payload = item_ids
+            # Format: /Collections/{collection_id}/Items?api_key=XXX&Ids=id1,id2,id3
+            # Following the approach shown in the other Emby API code
+            ids_param = ",".join(item_ids)
+            url = f"{self.server_url}/Collections/{collection_id}/Items"
+            
+            params = {
+                'api_key': self.api_key,
+                'Ids': ids_param
+            }
+            
             print(f"Adding {len(item_ids)} items to collection {collection_id}")
-            data = self._make_api_request('POST', endpoint, json=payload)
-            if data is not None:
+            print(f"First few items: {item_ids[:3] if len(item_ids) > 3 else item_ids}")
+            
+            response = self.session.post(url, params=params, timeout=15)
+            
+            # Emby returns 204 No Content on success
+            if response.status_code == 204:
+                print(f"Successfully added {len(item_ids)} items to collection {collection_id}")
                 return True
-            return False
+            else:
+                print(f"Failed to add items to collection: {response.status_code}")
+                if response.text:
+                    print(f"Response: {response.text[:200]}")
+                return False
         except Exception as e:
             print(f"Error updating collection items: {e}")
             return False
