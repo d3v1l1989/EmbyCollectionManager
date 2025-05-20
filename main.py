@@ -4,6 +4,7 @@ from src.config_loader import ConfigLoader
 from src.logging_setup import setup_logging
 import logging
 import sys
+import os
 from src.app_logic import main as app_main
 
 def main():
@@ -19,7 +20,14 @@ def main():
         logger.error("TMDb API key not set. Please update config/config.yaml or your .env file.")
         sys.exit(1)
         
-    # Run the main application logic
+    # Get the SYNC_TARGET from environment
+    sync_target = os.getenv('SYNC_TARGET', 'auto')
+    logger.info(f"Using sync target: {sync_target}")
+    
+    # Run the main application logic with the sync target
+    import sys
+    # Modify sys.argv to include the targets parameter
+    sys.argv.extend(['--targets', sync_target])
     app_main()
 
 if __name__ == "__main__":

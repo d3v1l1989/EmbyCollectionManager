@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-CMD="python -m src.app_logic"
+CMD="python main.py"
 
 # If using legacy SYNC_EMBY/SYNC_JELLYFIN vars, handle them for backward compatibility
 if [ "$SYNC_EMBY" = "1" ] || [ "$SYNC_JELLYFIN" = "1" ]; then
