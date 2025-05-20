@@ -244,22 +244,49 @@ class JellyfinClient(MediaServerClient):
             print(f"Only found {len(item_ids)} movies with batch method, trying full library scan...")
             try:
                 # Get all movies and manually check TMDb IDs
+                # We need to paginate to get ALL movies in the library
+                # This is critical for large libraries to match more TMDb IDs
                 params = {
                     'Recursive': 'true',
                     'IncludeItemTypes': 'Movie',
                     'Fields': 'ProviderIds,Path',
-                    'Limit': 200  # Get more movies at once
+                    'Limit': 800,  # Get many more movies at once
+                    'EnableTotalRecordCount': 'true'  # Get total count for pagination
                 }
                 
                 # Convert TMDb IDs to strings for comparison
                 tmdb_str_ids = set(str(tmdb_id) for tmdb_id in tmdb_ids)
                 
                 endpoint = f"/Users/{self.user_id}/Items"
-                data = self._make_api_request('GET', endpoint, params=params)
                 
-                if data and 'Items' in data:
-                    movies_count = len(data['Items'])
-                    print(f"Scanning {movies_count} movies in library for TMDb ID matches")
+                # Set up pagination variables
+                start_index = 0
+                page_size = 800
+                total_items = 0
+                processed_items = 0
+                
+                # First get total count of movies
+                count_params = dict(params)
+                count_params['Limit'] = 1
+                initial_data = self._make_api_request('GET', endpoint, params=count_params)
+                if initial_data and 'TotalRecordCount' in initial_data:
+                    total_items = initial_data['TotalRecordCount']
+                    print(f"Found total of {total_items} movies in Jellyfin library to scan for TMDb matches")
+                
+                # Now paginate through all movies in library
+                while True:
+                    current_params = dict(params)
+                    current_params['StartIndex'] = start_index
+                    current_params['Limit'] = page_size
+                    
+                    data = self._make_api_request('GET', endpoint, params=current_params)
+                    
+                    if not data or 'Items' not in data or not data['Items']:
+                        break
+                        
+                    page_items = len(data['Items'])
+                    processed_items += page_items
+                    print(f"Scanning {page_items} movies (page {start_index//page_size + 1}, {processed_items}/{total_items})")
                     
                     for item in data['Items']:
                         if 'ProviderIds' in item:
@@ -273,6 +300,13 @@ class JellyfinClient(MediaServerClient):
                                     if item_id not in item_ids:  # Avoid duplicates
                                         item_ids.append(item_id)
                                     break
+                    
+                    # If we got fewer items than requested, we've reached the end
+                    if page_items < page_size:
+                        break
+                        
+                    # Move to next page
+                    start_index += page_size
             except Exception as e:
                 print(f"Error scanning full library: {e}")
         
