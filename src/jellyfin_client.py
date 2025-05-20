@@ -291,7 +291,6 @@ class JellyfinClient(MediaServerClient):
         """
         Given a list of TMDb IDs, return the Jellyfin server's internal item IDs for owned movies.
         If collection_id is provided, items will be added to the collection incrementally in batches.
-        Collection size is limited to 500 movies maximum.
         
         Args:
             tmdb_ids: List of TMDb movie IDs.
@@ -301,11 +300,8 @@ class JellyfinClient(MediaServerClient):
         """
         item_ids = []
         
-        # Store the original count for reporting
-        original_count = len(tmdb_ids)
-        
-        # First scan the library to find all matches
-        print(f"Searching for {original_count} movies in Jellyfin library by TMDb IDs")
+        total_to_find = len(tmdb_ids)
+        print(f"Searching for {total_to_find} movies in Jellyfin library by TMDb IDs")
         
         # Convert TMDb IDs to strings for EXACT comparison
         # Create a set for O(1) lookup
@@ -458,45 +454,9 @@ class JellyfinClient(MediaServerClient):
             except Exception as simple_e:
                 print(f"Simple library scan also failed: {simple_e}")
         
-        # If we still have very few movies, add some recent popular ones as fallback
-        if len(item_ids) < 5:
-            print("Found very few matches. Adding some recent popular movies as fallback...")
-            try:
-                params = {
-                    'Recursive': 'true',
-                    'IncludeItemTypes': 'Movie',
-                    'SortBy': 'DateCreated,SortName',  # Recently added
-                    'SortOrder': 'Descending',
-                    'Limit': 20
-                }
-                data = self._make_api_request('GET', endpoint, params=params)
-                
-                fallback_ids = []
-                if data and 'Items' in data:
-                    for item in data['Items']:
-                        if item['Id'] not in item_ids:  # Avoid duplicates
-                            item_ids.append(item['Id'])
-                            fallback_ids.append(item['Id'])
-                            print(f"Added fallback movie: {item.get('Name', '(unknown)')} (ID: {item['Id']})")
-                            # Stop after we've added enough fallbacks
-                            if len(fallback_ids) >= 20:
-                                break
-                
-                # Add fallback items to collection if needed
-                if collection_id and fallback_ids:
-                    print(f"Adding {len(fallback_ids)} fallback movies to collection...")
-                    self.add_batch_to_collection(collection_id, fallback_ids)
-            except Exception as e:
-                print(f"Error adding fallback movies: {e}")
+        # No fallback - only include exact matches
         
         print(f"Found total of {len(item_ids)} matching movies in Jellyfin library")
-        
-        # Limit collection to 500 movies if we found more than that
-        if len(item_ids) > 500:
-            print(f"Limiting collection to 500 movies (from {len(item_ids)} found)")
-            # Sort by most recently added to prioritize newer movies
-            return item_ids[:500]
-        
         return item_ids
 
     def add_items_to_collection(self, collection_id: str, item_ids: List[str]) -> bool:
