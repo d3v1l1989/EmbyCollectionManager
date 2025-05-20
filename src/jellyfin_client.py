@@ -4,6 +4,7 @@ import logging
 import requests
 import random
 import re
+import time
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 from urllib.parse import quote
@@ -235,46 +236,43 @@ class JellyfinClient(MediaServerClient):
                 for tmdb_id in batch_tmdb_ids:
                     searched_tmdb_ids.add(str(tmdb_id))
                 
-                # Instead of using AnyProviderIdEquals which doesn't seem to be filtering properly,
-                # we'll use a different approach that's more reliable
+                # Format the provider IDs string
+                tmdb_id_strings = [f"tmdb.{tmdb_id}" for tmdb_id in batch_tmdb_ids]
+                provider_ids_str = ",".join(tmdb_id_strings)
                 
                 # Only report progress at intervals for large batches
                 if batch_idx % progress_report_interval == 0 or batch_idx == max_batches - 1:
                     print(f"Searching batch {batch_idx + 1}/{max_batches} with {len(batch_tmdb_ids)} TMDb IDs")
-                
-                # The key insight: For each TMDb ID, make an individual request to ensure exact matching
-                batch_results = []
-                
-                for tmdb_id in batch_tmdb_ids:
-                    # Exact search for this TMDb ID using ProviderIdEquals parameter
-                    params = {
-                        'Recursive': 'true',
-                        'IncludeItemTypes': 'Movie',
-                        'Fields': 'ProviderIds,Path',
-                        'ProviderIdEquals': f'Tmdb.{tmdb_id}'  # This ensures exact matching
-                    }
                     
-                    endpoint = f"/Users/{self.user_id}/Items"
-                    data = self._make_api_request('GET', endpoint, params=params)
-                    
-                    if data and 'Items' in data and data['Items']:
-                        # We should have exact matches now
-                        for item in data['Items']:
-                            batch_results.append(item)
-                            # Log each match for debugging
-                            if batch_idx < 2 or len(item_ids) < 50:  # Limit logging for large collections
-                                print(f"  - Found match for TMDb ID {tmdb_id}: {item.get('Name', '(unknown)')} (ID: {item['Id']})")
+                params = {
+                    'Recursive': 'true',
+                    'IncludeItemTypes': 'Movie',
+                    'Fields': 'ProviderIds,Path',
+                    'AnyProviderIdEquals': provider_ids_str,
+                    'Limit': 100  # Request more items than we expect to get
+                }
                 
-                # Process the batch results
-                if batch_results:
+                endpoint = f"/Users/{self.user_id}/Items"
+                
+                # Make the API request to search for movies with these TMDb IDs
+                data = self._make_api_request('GET', endpoint, params=params)
+                
+                if data and 'Items' in data and data['Items']:
+                    batch_matches = len(data['Items'])
+                    
+                    # Track batch progress for larger collections
+                    processed_count += len(batch_tmdb_ids)
+                    progress_pct = (processed_count / len(tmdb_ids)) * 100 if tmdb_ids else 0
+                    
                     # Create a set of existing IDs for faster lookup
                     existing_ids = set(item_ids)
                     
                     # Track how many new movies we find with each batch
+                    new_in_batch = 0
                     batch_item_ids = []
                     
                     # Process the matches - collect all the new IDs first
-                    for item in batch_results:  # Use batch_results instead of data['Items']
+                    for item in data['Items']:
                         name = item.get('Name', '(unknown)')
                         item_id = item['Id']
                         
@@ -288,22 +286,23 @@ class JellyfinClient(MediaServerClient):
                     for item_id, name in batch_item_ids:
                         item_ids.append(item_id)
                     
-                    # Process the batch and track progress
-                    processed_count += len(batch_tmdb_ids)
-                    progress_pct = (processed_count / len(tmdb_ids)) * 100 if tmdb_ids else 0
-                    
                     # Report results for this batch
                     if batch_idx % progress_report_interval == 0 or batch_idx == max_batches - 1 or new_in_batch > 0:
-                        print(f"Batch {batch_idx + 1}/{max_batches}: Found {len(batch_results)} matches, added {new_in_batch} new items (total: {len(item_ids)}, {progress_pct:.1f}% complete)")
+                        print(f"Found {batch_matches} matches in batch {batch_idx + 1}/{max_batches}, added {new_in_batch} new items (total: {len(item_ids)})")
                     
-                    # For large collections, just show a summary after the first few batches
-                    if len(item_ids) >= 100 and batch_idx >= 2 and new_in_batch > 0:
+                    # Only log individual items for smaller collections or initial batches
+                    if len(item_ids) < 100 or batch_idx < 2:  # Limit logging for very large collections
+                        for item_id, name in batch_item_ids[:min(50, len(batch_item_ids))]:
+                            print(f"  - Found match: {name} (ID: {item_id})")
+                    
+                    # For large batches, just report summary
+                    elif new_in_batch > 0:
                         print(f"  - Added {new_in_batch} new unique movies from this batch (total now: {len(item_ids)})")
-                        if new_in_batch <= 5:
+                        if new_in_batch > 0 and new_in_batch <= 5:
                             # Show just a few examples when only a small number of new items were found
                             for item_id, name in batch_item_ids:
                                 print(f"    - Added: {name} (ID: {item_id})")
-                        else:
+                        elif new_in_batch > 5:
                             # Show a small sample of the new additions
                             for item_id, name in batch_item_ids[:3]:
                                 print(f"    - Added: {name} (ID: {item_id})")
@@ -313,16 +312,16 @@ class JellyfinClient(MediaServerClient):
         except Exception as e:
             print(f"Error searching by batched provider IDs: {e}")
         
-        # Report the final results from the batch processing
+        # This check ensures we're not returning early with just 100 matches
+        # If we have found a substantial number of movies and have processed most batches, skip the full scan
         print(f"Batch processing complete. Found {len(item_ids)} total unique movies across all batches.")
         
-        # With our improved approach, we should have found most relevant movies already
-        # Only fall back to full library scan in extreme cases
-        if len(item_ids) < 10 and total_to_find > 100:  # Almost nothing found
-            print(f"Only found {len(item_ids)} movies with improved batch method (out of {total_to_find} TMDb IDs), trying full library scan as a last resort...")
+        # Only use the library scan as a fallback if we found a very small percentage of what we expected
+        if len(item_ids) < 200 and total_to_find > 500 and (len(item_ids) < total_to_find / 20):  # Very low match rate
+            print(f"Only found {len(item_ids)} movies with batch method (out of {total_to_find} TMDb IDs), trying full library scan...")
         else:
-            # We have a reasonable number of matches from our improved method, skip the full scan
-            print(f"Improved batch method found {len(item_ids)} movies, which is sufficient. Skipping full library scan.")
+            # We have a reasonable number of matches from batch method, skip the full scan
+            print(f"Batch method found {len(item_ids)} movies, which is sufficient. Skipping full library scan.")
             return item_ids
             try:
                 # Get all movies and manually check TMDb IDs
@@ -585,18 +584,53 @@ class JellyfinClient(MediaServerClient):
                 if response.status_code in [200, 204]:
                     print(f"Successfully added all {len(deduplicated_ids)} items to collection at once!")
                     # Verify collection item count
-                    print(f"Verifying collection content after adding items...")
                     try:
+                        print(f"Verifying final collection content...")
+                        # First try the collections endpoint
                         verification_url = f"{self.server_url}/Collections/{collection_id}?api_key={self.api_key}"
-                        verify_response = self.session.get(verification_url, timeout=15)
+                        verify_response = self.session.get(verification_url, timeout=30)
                         if verify_response.status_code == 200:
                             collection_data = verify_response.json()
                             child_count = collection_data.get('ChildCount', 0)
-                            print(f"Collection now contains {child_count} items according to Jellyfin")
+                            print(f"Collection now contains {child_count} items according to Jellyfin metadata")
+                            
+                            # Now try actually fetching the collection items to verify
+                            items_url = f"{self.server_url}/Collections/{collection_id}/Items?api_key={self.api_key}"
+                            items_response = self.session.get(items_url, timeout=30)
+                            if items_response.status_code == 200:
+                                items_data = items_response.json()
+                                actual_items = items_data.get('Items', [])
+                                actual_count = len(actual_items)
+                                print(f"Verified actual collection content: {actual_count} items in the collection")
+                                # Print first few items to verify content
+                                if actual_items and actual_count > 0:
+                                    print("Sample items in the collection:")
+                                    for item in actual_items[:min(5, len(actual_items))]:
+                                        print(f"  - {item.get('Name', 'Unknown')} ({item.get('Id', 'No ID')})")
+                                
+                                if actual_count != child_count:
+                                    print(f"WARNING: Discrepancy between reported count ({child_count}) and actual items ({actual_count})")
+                            else:
+                                print(f"Failed to verify actual collection content: HTTP {items_response.status_code}")
                         else:
                             print(f"Failed to verify collection content: HTTP {verify_response.status_code}")
                     except Exception as ve:
                         print(f"Error verifying collection content: {ve}")
+                        
+                    print(f"Added {total_added} out of {len(deduplicated_ids)} items to collection")
+                    
+                    # Force refresh the collection to make sure Jellyfin updates its metadata
+                    try:
+                        print("Refreshing collection to update metadata...")
+                        refresh_url = f"{self.server_url}/Items/{collection_id}/Refresh?api_key={self.api_key}"
+                        refresh_response = self.session.post(refresh_url, timeout=15)
+                        if refresh_response.status_code in [200, 204]:
+                            print("Collection refresh triggered successfully")
+                        else:
+                            print(f"Failed to refresh collection: HTTP {refresh_response.status_code}")
+                    except Exception as re:
+                        print(f"Error refreshing collection: {re}")
+                        
                     return True
                 else:
                     print(f"Both methods failed. HTTP codes: {response1.status_code}, {response2.status_code}")
@@ -608,10 +642,9 @@ class JellyfinClient(MediaServerClient):
                 print("Falling back to batch processing...")
             
             # Fall back to testing different batch sizes to find what works
-            print("Testing multiple batch sizes to find what works best...")
-            
+            # Starting with a more reasonable batch size based on observed Jellyfin behavior
             # Try different batch sizes to find what works
-            batch_sizes = [200, 100, 50, 20]
+            batch_sizes = [50, 25, 10, 5]
             
             # Keep track of which batch size worked
             effective_batch_size = None
@@ -628,7 +661,7 @@ class JellyfinClient(MediaServerClient):
                     test_url = f"{self.server_url}{endpoint}?api_key={self.api_key}"
                     test_params = {'ids': test_batch_str}
                     
-                    test_response = self.session.post(test_url, params=test_params, timeout=15)
+                    test_response = self.session.post(test_url, params=test_params, timeout=30)
                     
                     if test_response.status_code in [200, 204]:
                         print(f"Batch size {size} works! Using this for processing.")
@@ -636,13 +669,15 @@ class JellyfinClient(MediaServerClient):
                         break
                     else:
                         print(f"Batch size {size} failed with HTTP {test_response.status_code}")
+                        if test_response.text:
+                            print(f"Error details: {test_response.text[:200]}")
                 except Exception as test_e:
                     print(f"Error testing batch size {size}: {test_e}")
             
             # If none of our test sizes worked, use the smallest
             if not effective_batch_size:
-                print("All test batch sizes failed. Using smallest size (20) as fallback.")
-                effective_batch_size = 20
+                print("All test batch sizes failed. Using smallest size (5) as fallback.")
+                effective_batch_size = 5
                 
             print(f"Processing all {len(deduplicated_ids)} items using batch size of {effective_batch_size}")
             
@@ -661,12 +696,22 @@ class JellyfinClient(MediaServerClient):
                     print(f"Adding batch of {len(batch)} items to collection (batch {i//effective_batch_size + 1} of {(len(deduplicated_ids) + effective_batch_size - 1)//effective_batch_size})...")
                     
                     # Try params method first
-                    response = self.session.post(url, params=params, timeout=15)
+                    response = self.session.post(url, params=params, timeout=30)
                     
                     # If params method fails, try direct URL method
                     if response.status_code not in [200, 204]:
+                        print(f"Params method failed with HTTP {response.status_code}, trying direct URL")
                         direct_url = f"{url}&ids={batch_str}"
-                        response = self.session.post(direct_url, timeout=15)
+                        response = self.session.post(direct_url, timeout=30)
+                        
+                    # Log response headers for debugging
+                    print(f"Response headers: {dict(response.headers)}")
+                    
+                    # Wait briefly after each batch to avoid overwhelming the API
+                    if len(batch) > 10:
+                        # Sleep briefly to prevent Jellyfin API throttling
+                        print("Sleeping 2 seconds to avoid API rate limits...")
+                        time.sleep(2)
                         
                     if response.status_code in [200, 204]:
                         print(f"Successfully added batch of {len(batch)} items to collection")
