@@ -235,43 +235,46 @@ class JellyfinClient(MediaServerClient):
                 for tmdb_id in batch_tmdb_ids:
                     searched_tmdb_ids.add(str(tmdb_id))
                 
-                # Format the provider IDs string
-                tmdb_id_strings = [f"tmdb.{tmdb_id}" for tmdb_id in batch_tmdb_ids]
-                provider_ids_str = ",".join(tmdb_id_strings)
+                # Instead of using AnyProviderIdEquals which doesn't seem to be filtering properly,
+                # we'll use a different approach that's more reliable
                 
                 # Only report progress at intervals for large batches
                 if batch_idx % progress_report_interval == 0 or batch_idx == max_batches - 1:
                     print(f"Searching batch {batch_idx + 1}/{max_batches} with {len(batch_tmdb_ids)} TMDb IDs")
-                    
-                params = {
-                    'Recursive': 'true',
-                    'IncludeItemTypes': 'Movie',
-                    'Fields': 'ProviderIds,Path',
-                    'AnyProviderIdEquals': provider_ids_str,
-                    'Limit': 100  # Request more items than we expect to get
-                }
                 
-                endpoint = f"/Users/{self.user_id}/Items"
+                # The key insight: For each TMDb ID, make an individual request to ensure exact matching
+                batch_results = []
                 
-                # Make the API request to search for movies with these TMDb IDs
-                data = self._make_api_request('GET', endpoint, params=params)
+                for tmdb_id in batch_tmdb_ids:
+                    # Exact search for this TMDb ID using ProviderIdEquals parameter
+                    params = {
+                        'Recursive': 'true',
+                        'IncludeItemTypes': 'Movie',
+                        'Fields': 'ProviderIds,Path',
+                        'ProviderIdEquals': f'Tmdb.{tmdb_id}'  # This ensures exact matching
+                    }
+                    
+                    endpoint = f"/Users/{self.user_id}/Items"
+                    data = self._make_api_request('GET', endpoint, params=params)
+                    
+                    if data and 'Items' in data and data['Items']:
+                        # We should have exact matches now
+                        for item in data['Items']:
+                            batch_results.append(item)
+                            # Log each match for debugging
+                            if batch_idx < 2 or len(item_ids) < 50:  # Limit logging for large collections
+                                print(f"  - Found match for TMDb ID {tmdb_id}: {item.get('Name', '(unknown)')} (ID: {item['Id']})")
                 
-                if data and 'Items' in data and data['Items']:
-                    batch_matches = len(data['Items'])
-                    
-                    # Track batch progress for larger collections
-                    processed_count += len(batch_tmdb_ids)
-                    progress_pct = (processed_count / len(tmdb_ids)) * 100 if tmdb_ids else 0
-                    
+                # Process the batch results
+                if batch_results:
                     # Create a set of existing IDs for faster lookup
                     existing_ids = set(item_ids)
                     
                     # Track how many new movies we find with each batch
-                    new_in_batch = 0
                     batch_item_ids = []
                     
                     # Process the matches - collect all the new IDs first
-                    for item in data['Items']:
+                    for item in batch_results:  # Use batch_results instead of data['Items']
                         name = item.get('Name', '(unknown)')
                         item_id = item['Id']
                         
@@ -285,23 +288,22 @@ class JellyfinClient(MediaServerClient):
                     for item_id, name in batch_item_ids:
                         item_ids.append(item_id)
                     
+                    # Process the batch and track progress
+                    processed_count += len(batch_tmdb_ids)
+                    progress_pct = (processed_count / len(tmdb_ids)) * 100 if tmdb_ids else 0
+                    
                     # Report results for this batch
                     if batch_idx % progress_report_interval == 0 or batch_idx == max_batches - 1 or new_in_batch > 0:
-                        print(f"Found {batch_matches} matches in batch {batch_idx + 1}/{max_batches}, added {new_in_batch} new items (total: {len(item_ids)})")
+                        print(f"Batch {batch_idx + 1}/{max_batches}: Found {len(batch_results)} matches, added {new_in_batch} new items (total: {len(item_ids)}, {progress_pct:.1f}% complete)")
                     
-                    # Only log individual items for smaller collections or initial batches
-                    if len(item_ids) < 100 or batch_idx < 2:  # Limit logging for very large collections
-                        for item_id, name in batch_item_ids[:min(50, len(batch_item_ids))]:
-                            print(f"  - Found match: {name} (ID: {item_id})")
-                    
-                    # For large batches, just report summary
-                    elif new_in_batch > 0:
+                    # For large collections, just show a summary after the first few batches
+                    if len(item_ids) >= 100 and batch_idx >= 2 and new_in_batch > 0:
                         print(f"  - Added {new_in_batch} new unique movies from this batch (total now: {len(item_ids)})")
-                        if new_in_batch > 0 and new_in_batch <= 5:
+                        if new_in_batch <= 5:
                             # Show just a few examples when only a small number of new items were found
                             for item_id, name in batch_item_ids:
                                 print(f"    - Added: {name} (ID: {item_id})")
-                        elif new_in_batch > 5:
+                        else:
                             # Show a small sample of the new additions
                             for item_id, name in batch_item_ids[:3]:
                                 print(f"    - Added: {name} (ID: {item_id})")
@@ -311,16 +313,16 @@ class JellyfinClient(MediaServerClient):
         except Exception as e:
             print(f"Error searching by batched provider IDs: {e}")
         
-        # This check ensures we're not returning early with just 100 matches
-        # If we have found a substantial number of movies and have processed most batches, skip the full scan
+        # Report the final results from the batch processing
         print(f"Batch processing complete. Found {len(item_ids)} total unique movies across all batches.")
         
-        # Only use the library scan as a fallback if we found a very small percentage of what we expected
-        if len(item_ids) < 200 and total_to_find > 500 and (len(item_ids) < total_to_find / 20):  # Very low match rate
-            print(f"Only found {len(item_ids)} movies with batch method (out of {total_to_find} TMDb IDs), trying full library scan...")
+        # With our improved approach, we should have found most relevant movies already
+        # Only fall back to full library scan in extreme cases
+        if len(item_ids) < 10 and total_to_find > 100:  # Almost nothing found
+            print(f"Only found {len(item_ids)} movies with improved batch method (out of {total_to_find} TMDb IDs), trying full library scan as a last resort...")
         else:
-            # We have a reasonable number of matches from batch method, skip the full scan
-            print(f"Batch method found {len(item_ids)} movies, which is sufficient. Skipping full library scan.")
+            # We have a reasonable number of matches from our improved method, skip the full scan
+            print(f"Improved batch method found {len(item_ids)} movies, which is sufficient. Skipping full library scan.")
             return item_ids
             try:
                 # Get all movies and manually check TMDb IDs
