@@ -1,7 +1,11 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any, Union
 import hashlib
 import logging
 import requests
+import random
+import re
+from PIL import Image, ImageDraw, ImageFont
+from io import BytesIO
 from urllib.parse import quote
 from .base_media_server_client import MediaServerClient
 
@@ -429,3 +433,558 @@ class JellyfinClient(MediaServerClient):
             print(f"Failed to update any artwork for collection {collection_id}")
                 
         return success
+        
+    def find_collection_with_name_or_create(self, collection_name: str, list_id: Optional[str]=None, 
+                                            description: Optional[str]=None, plugin_name: Optional[str]=None) -> str:
+        """
+        Find a collection by name or create it if it doesn't exist.
+        Extended version of get_or_create_collection with additional metadata support.
+        
+        Args:
+            collection_name: Name of the collection
+            list_id: External ID/reference for the collection
+            description: Description text for the collection
+            plugin_name: Name of plugin/source generating the collection
+            
+        Returns:
+            The collection ID (str) or None if not found/created
+        """
+        # First, try to get the collection by name
+        params = {
+            'IncludeItemTypes': 'BoxSet',
+            'Recursive': 'true',
+            'SearchTerm': collection_name,
+            'Fields': 'Name,Overview'
+        }
+        endpoint = f"/Users/{self.user_id}/Items"
+        logger.info(f"Searching for collection: '{collection_name}'")
+        data = self._make_api_request('GET', endpoint, params=params)
+        
+        if data and 'Items' in data:
+            for item in data['Items']:
+                if item.get('Name', '').lower() == collection_name.lower():
+                    logger.info(f"Found existing collection: {item['Name']} (ID: {item['Id']})")
+                    
+                    # Update description if provided and collection doesn't have one
+                    if description and not item.get('Overview'):
+                        self._update_collection_metadata(item['Id'], collection_name, description, list_id, plugin_name)
+                    
+                    return item['Id']
+        
+        # Collection doesn't exist, create it with metadata
+        return self._create_collection_with_metadata(collection_name, description, list_id, plugin_name)
+    
+    def _create_collection_with_metadata(self, collection_name: str, description: Optional[str]=None, 
+                                         list_id: Optional[str]=None, plugin_name: Optional[str]=None) -> Optional[str]:
+        """
+        Create a new collection with metadata.
+        
+        Args:
+            collection_name: Name of the collection
+            description: Description text for the collection
+            list_id: External ID for the collection
+            plugin_name: Name of plugin/source generating the collection
+            
+        Returns:
+            The collection ID (str) or None if creation failed
+        """
+        # Similar to get_or_create_collection but adding the metadata
+        logger.info(f"Creating new collection '{collection_name}'")
+        
+        # First get a movie from the library to use as a starting point
+        params = {
+            'IncludeItemTypes': 'Movie',
+            'Recursive': 'true',
+            'Limit': 1
+        }
+        endpoint = f"/Users/{self.user_id}/Items"
+        item_data = self._make_api_request('GET', endpoint, params=params)
+        
+        try:
+            # Try to create collection with a sample item
+            if item_data and 'Items' in item_data and item_data['Items']:
+                sample_item_id = item_data['Items'][0]['Id']
+                logger.info(f"Found sample item with ID: {sample_item_id} to use for collection creation")
+                
+                # Create the collection
+                url = f"{self.server_url}/Collections"
+                payload = {
+                    'Name': collection_name,
+                    'IsLocked': True,
+                    'Ids': [sample_item_id]  # Include the sample item
+                }
+                
+                logger.info(f"Creating collection with sample item...")
+                response = self.session.post(f"{url}?api_key={self.api_key}", json=payload, timeout=15)
+                
+                if response.status_code in [200, 201, 204] and response.text:
+                    try:
+                        data = response.json()
+                        if data and 'Id' in data:
+                            collection_id = data['Id']
+                            logger.info(f"Successfully created collection '{collection_name}' with ID: {collection_id}")
+                            
+                            # Remove the temporary item immediately
+                            try:
+                                remove_url = f"{self.server_url}/Collections/{collection_id}/Items/{sample_item_id}?api_key={self.api_key}"
+                                logger.info(f"Removing temporary item {sample_item_id} from collection...")
+                                remove_response = self.session.delete(remove_url, timeout=15)
+                                
+                                if remove_response.status_code in [200, 204]:
+                                    logger.info(f"Successfully removed temporary item from collection")
+                                else:
+                                    logger.warning(f"Failed to remove temporary item: HTTP {remove_response.status_code}")
+                            except Exception as e:
+                                logger.error(f"Error removing temporary item: {e}")
+                            
+                            # Update collection metadata if provided
+                            self._update_collection_metadata(collection_id, collection_name, description, list_id, plugin_name)
+                            
+                            return collection_id
+                    except Exception as e:
+                        logger.error(f"Error parsing collection creation response: {e}")
+                else:
+                    logger.error(f"Collection creation failed: HTTP {response.status_code}")
+                    if response.text:
+                        logger.error(f"Response: {response.text[:200]}")
+            else:
+                logger.error("Failed to find a sample item for collection creation")
+                # Try to create an empty collection
+                return self._create_empty_collection(collection_name, description)
+        except Exception as e:
+            logger.error(f"Error during collection creation: {e}")
+            return self._create_empty_collection(collection_name, description)
+            
+        return None
+    
+    def _create_empty_collection(self, collection_name: str, description: Optional[str]=None) -> Optional[str]:
+        """
+        Create an empty collection without initial items.
+        
+        Args:
+            collection_name: Name of the collection
+            description: Description text for the collection
+            
+        Returns:
+            The collection ID (str) or None if creation failed
+        """
+        try:
+            url = f"{self.server_url}/Collections"
+            payload = {
+                'Name': collection_name,
+                'IsLocked': True
+            }
+            
+            if description:
+                payload['Overview'] = description
+                
+            logger.info(f"Creating empty collection...")
+            response = self.session.post(f"{url}?api_key={self.api_key}", json=payload, timeout=15)
+            
+            if response.status_code in [200, 201, 204]:
+                try:
+                    data = response.json()
+                    if data and 'Id' in data:
+                        logger.info(f"Successfully created empty collection '{collection_name}' with ID: {data['Id']}")
+                        return data['Id']
+                except Exception as e:
+                    logger.error(f"Error parsing empty collection creation response: {e}")
+            else:
+                logger.error(f"Empty collection creation failed: HTTP {response.status_code}")
+                if response.text:
+                    logger.error(f"Response: {response.text[:200]}")
+        except Exception as e:
+            logger.error(f"Error during empty collection creation: {e}")
+            
+        return None
+    
+    def _update_collection_metadata(self, collection_id: str, name: str, description: Optional[str]=None, 
+                                    list_id: Optional[str]=None, plugin_name: Optional[str]=None) -> bool:
+        """
+        Update metadata for a collection such as description and external IDs.
+        
+        Args:
+            collection_id: Jellyfin collection ID
+            name: Collection name
+            description: Collection description
+            list_id: External ID/reference
+            plugin_name: Source plugin name
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # First get current item details
+            endpoint = f"/Items/{collection_id}"
+            item_data = self._make_api_request('GET', endpoint)
+            
+            if not item_data:
+                logger.error(f"Couldn't retrieve collection data for ID: {collection_id}")
+                return False
+                
+            # Create update payload based on current item data
+            payload = {
+                'Id': collection_id,
+                'Name': name
+            }
+            
+            # Add description if provided
+            if description:
+                payload['Overview'] = description
+                
+            # Add provider IDs if list_id and plugin_name are provided
+            if list_id and plugin_name:
+                if 'ProviderIds' not in payload:
+                    payload['ProviderIds'] = {}
+                
+                # Use the plugin name as provider name and list_id as the value
+                payload['ProviderIds'][plugin_name] = list_id
+                
+            # Use the API to update the item
+            endpoint = f"/Items/{collection_id}"
+            response = self.session.post(
+                f"{self.server_url}{endpoint}?api_key={self.api_key}", 
+                json=payload,
+                timeout=15
+            )
+            
+            if response.status_code in [200, 204]:
+                logger.info(f"Successfully updated metadata for collection '{name}'")
+                return True
+            else:
+                logger.error(f"Failed to update collection metadata: HTTP {response.status_code}")
+                if response.text:
+                    logger.error(f"Response: {response.text[:200]}")
+                return False
+        except Exception as e:
+            logger.error(f"Error updating collection metadata: {e}")
+            return False
+    
+    def clear_collection(self, collection_id: str) -> bool:
+        """
+        Remove all items from a collection.
+        
+        Args:
+            collection_id: The Jellyfin collection ID
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Replace with an empty array to clear the collection
+            response = self.update_collection_items(collection_id, [])
+            if response:
+                logger.info(f"Successfully cleared all items from collection {collection_id}")
+            else:
+                logger.error(f"Failed to clear collection {collection_id}")
+            return response
+        except Exception as e:
+            logger.error(f"Error clearing collection {collection_id}: {e}")
+            return False
+    
+    def add_item_to_collection(self, collection_id: str, item_info: Dict[str, Any], 
+                               year_filter: bool=True, jellyfin_query_parameters: Dict[str, Any]={}) -> bool:
+        """
+        Add a single item to a collection with flexible matching.
+        
+        Args:
+            collection_id: The Jellyfin collection ID
+            item_info: Dictionary containing item details (title, year, ids)
+            year_filter: Whether to filter by year when matching
+            jellyfin_query_parameters: Additional query parameters to use when searching
+            
+        Returns:
+            True if item was found and added, False otherwise
+        """
+        try:
+            # Extract item details
+            title = item_info.get('title')
+            if not title:
+                logger.error("No title provided for item matching")
+                return False
+                
+            # Extract identified IDs
+            tmdb_id = item_info.get('tmdb_id') or item_info.get('id')
+            imdb_id = item_info.get('imdb_id')
+            year = item_info.get('year')
+            
+            matched_items = []
+            
+            # Try to match by external IDs first (more precise)
+            if tmdb_id:
+                # Try to find by TMDb ID
+                tmdb_items = self._find_library_items_by_provider_id('tmdb', str(tmdb_id))
+                if tmdb_items:
+                    matched_items.extend(tmdb_items)
+                    
+            if imdb_id and not matched_items:
+                # Try to find by IMDb ID if no TMDb matches
+                imdb_items = self._find_library_items_by_provider_id('imdb', imdb_id)
+                if imdb_items:
+                    matched_items.extend(imdb_items)
+            
+            # If no matches by ID, try title search
+            if not matched_items:
+                # Search by title
+                params = {
+                    'SearchTerm': title,
+                    'IncludeItemTypes': 'Movie',
+                    'Recursive': 'true',
+                    'Limit': 5,  # Get a few potential matches
+                    'Fields': 'ProviderIds,ProductionYear'
+                }
+                
+                # Add any additional query parameters
+                if jellyfin_query_parameters:
+                    params.update(jellyfin_query_parameters)
+                
+                endpoint = f"/Users/{self.user_id}/Items"
+                search_data = self._make_api_request('GET', endpoint, params=params)
+                
+                if search_data and 'Items' in search_data:
+                    # Filter by title and year if requested
+                    for item in search_data['Items']:
+                        item_title = item.get('Name', '')
+                        item_year = item.get('ProductionYear')
+                        
+                        title_match = title.lower() == item_title.lower()
+                        year_match = not year_filter or not year or not item_year or int(year) == item_year
+                        
+                        if title_match and year_match:
+                            matched_items.append(item)
+            
+            # Handle matched items
+            if not matched_items:
+                logger.warning(f"No matches found for '{title}'" + (f" ({year})" if year else ""))
+                return False
+                
+            # Get first match ID
+            item_id = matched_items[0]['Id']
+            
+            # Get current collection items
+            current_items = self._get_collection_items(collection_id)
+            if item_id in current_items:
+                logger.info(f"Item '{title}' already in collection")
+                return True
+                
+            # Add the item to the collection
+            endpoint = f"/Collections/{collection_id}/Items"
+            params = {'ids': item_id}
+            
+            response = self.session.post(
+                f"{self.server_url}{endpoint}?api_key={self.api_key}",
+                params=params,
+                timeout=15
+            )
+            
+            if response.status_code in [200, 204]:
+                logger.info(f"Successfully added '{title}' to collection")
+                return True
+            else:
+                logger.error(f"Failed to add item to collection: HTTP {response.status_code}")
+                if response.text:
+                    logger.error(f"Response: {response.text[:200]}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error adding item to collection: {e}")
+            return False
+    
+    def _find_library_items_by_provider_id(self, provider: str, id_value: str) -> List[Dict[str, Any]]:
+        """
+        Find library items by an external provider ID.
+        
+        Args:
+            provider: Provider name (e.g., 'tmdb', 'imdb')
+            id_value: ID value to search for
+            
+        Returns:
+            List of matching item data dictionaries
+        """
+        try:
+            # Jellyfin's endpoint for searching by provider ID
+            endpoint = f"/Users/{self.user_id}/Items"
+            params = {
+                f"ProviderIds": f"{provider}.{id_value}",
+                'Recursive': 'true',
+                'Fields': 'ProviderIds,ProductionYear'
+            }
+            
+            data = self._make_api_request('GET', endpoint, params=params)
+            
+            if data and 'Items' in data and data['Items']:
+                return data['Items']
+                
+        except Exception as e:
+            logger.error(f"Error finding items by provider ID: {e}")
+            
+        return []
+    
+    def _get_collection_items(self, collection_id: str) -> List[str]:
+        """
+        Get the current item IDs in a collection.
+        
+        Args:
+            collection_id: The Jellyfin collection ID
+            
+        Returns:
+            List of item IDs currently in the collection
+        """
+        try:
+            endpoint = f"/Collections/{collection_id}/Items"
+            params = {
+                'Fields': 'Id',
+            }
+            
+            data = self._make_api_request('GET', endpoint, params=params)
+            
+            if data and 'Items' in data:
+                return [item['Id'] for item in data['Items']]
+                
+        except Exception as e:
+            logger.error(f"Error getting collection items: {e}")
+            
+        return []
+    
+    def has_poster(self, collection_id: str) -> bool:
+        """
+        Check if a collection has a poster image.
+        
+        Args:
+            collection_id: The Jellyfin collection ID
+            
+        Returns:
+            True if the collection has a poster, False otherwise
+        """
+        try:
+            # Check for primary image information
+            endpoint = f"/Items/{collection_id}/Images"
+            data = self._make_api_request('GET', endpoint)
+            
+            if data:
+                for image in data:
+                    if image.get('Type') == 'Primary':
+                        return True
+                        
+        except Exception as e:
+            logger.error(f"Error checking for collection poster: {e}")
+            
+        return False
+        
+    def make_poster(self, collection_id: str, collection_name: str) -> bool:
+        """
+        Generate a simple poster for a collection if none exists.
+        
+        Args:
+            collection_id: The Jellyfin collection ID
+            collection_name: Name of the collection
+            
+        Returns:
+            True if poster was successfully created and uploaded, False otherwise
+        """
+        try:
+            # First check if poster already exists
+            if self.has_poster(collection_id):
+                logger.info(f"Collection already has a poster image")
+                return True
+                
+            # Create a simple poster image with text
+            width, height = 1000, 1500
+            bg_color = (random.randint(0, 50), random.randint(0, 50), random.randint(0, 100))
+            text_color = (220, 220, 220)
+            
+            # Create a new image with a solid background color
+            image = Image.new('RGB', (width, height), color=bg_color)
+            draw = ImageDraw.Draw(image)
+            
+            # Try to get system font, or use default
+            try:
+                # Try to get a nicer font if available
+                try:
+                    # For Windows
+                    font_path = "C:\\Windows\\Fonts\\Arial.ttf"
+                    title_font = ImageFont.truetype(font_path, 80)
+                except:
+                    # Fallback to default
+                    title_font = ImageFont.load_default()
+            except:
+                # Just use default font if all else fails
+                title_font = ImageFont.load_default()
+                
+            # Center and word-wrap text
+            lines = []
+            words = collection_name.split()
+            current_line = []
+            
+            # Simple word-wrapping logic
+            for word in words:
+                current_line.append(word)
+                test_line = ' '.join(current_line)
+                try:
+                    # Get text width if font supports it
+                    text_width = draw.textlength(test_line, font=title_font)
+                    if text_width > width - 100:  # Leave margins
+                        current_line.pop()
+                        lines.append(' '.join(current_line))
+                        current_line = [word]
+                except:
+                    # Fallback if textlength not supported
+                    if len(test_line) > 20:  # Arbitrary length
+                        current_line.pop()
+                        lines.append(' '.join(current_line))
+                        current_line = [word]
+                        
+            if current_line:
+                lines.append(' '.join(current_line))
+                
+            # Draw text lines
+            y_position = height // 2 - (len(lines) * 100) // 2
+            for line in lines:
+                try:
+                    # Get text width for centering if supported
+                    try:
+                        text_width = draw.textlength(line, font=title_font)
+                        x_position = (width - text_width) // 2
+                    except:
+                        x_position = 100  # Fallback margin
+                        
+                    draw.text((x_position, y_position), line, fill=text_color, font=title_font)
+                except Exception as inner_e:
+                    logger.error(f"Error drawing text: {inner_e}")
+                    # Fallback simple text
+                    draw.text((100, y_position), line, fill=text_color)
+                    
+                y_position += 100
+                
+            # Save image to a buffer
+            buffer = BytesIO()
+            image.save(buffer, format="JPEG", quality=90)
+            buffer.seek(0)
+            
+            # Upload the image to Jellyfin
+            try:
+                endpoint = f"/Items/{collection_id}/Images/Primary"
+                headers = {"Content-Type": "image/jpeg"}
+                
+                response = self.session.post(
+                    f"{self.server_url}{endpoint}?api_key={self.api_key}",
+                    data=buffer.read(),
+                    headers=headers,
+                    timeout=30
+                )
+                
+                if response.status_code in [200, 204]:
+                    logger.info(f"Successfully uploaded generated poster for collection '{collection_name}'")
+                    return True
+                else:
+                    logger.error(f"Failed to upload generated poster: HTTP {response.status_code}")
+                    if response.text:
+                        logger.error(f"Response: {response.text[:200]}")
+                    return False
+            except Exception as e:
+                logger.error(f"Error uploading generated poster: {e}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error generating collection poster: {e}")
+            return False

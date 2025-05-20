@@ -1,0 +1,41 @@
+---
+# Sample custom lists file for TMDbCollector
+# This file demonstrates different ways to define collections for Jellyfin
+
+# Example 1: Simple list with TMDb IDs
+- name: "Oscar Winners 2020s"
+  description: "Academy Award winning films from 2020 onwards"
+  clear_collection: true  # Remove existing items before adding new ones
+  items:
+    - 581734  # Nomadland (2020)
+    - 520763  # The Power of the Dog (2021) 
+    - 614934  # Everything Everywhere All at Once (2022)
+    - 702091  # Oppenheimer (2023)
+
+# Example 2: List with mixed item formats
+- name: "Sci-Fi Masterpieces"
+  description: "A collection of influential science fiction films"
+  items:
+    # Full item details with TMDb ID, title and year
+    - id: 62
+      title: "2001: A Space Odyssey"
+      year: 1968
+    # Just TMDb ID (title and year will be fetched from TMDb)
+    - 335984  # Blade Runner 2049
+    - 78
+    - 18
+    # With IMDb ID
+    - title: "Dune"
+      year: 2021
+      imdb_id: "tt1160419"
+
+# Example 3: Director collection
+- name: "Christopher Nolan Films"
+  list_id: "nolan_collection"  # Optional custom ID
+  description: "Films directed by Christopher Nolan"
+  items:
+    - 155  # The Dark Knight
+    - 27205  # Inception
+    - 157336  # Interstellar
+    - 419704  # Dunkirk
+    - 702091  # Oppenheimer

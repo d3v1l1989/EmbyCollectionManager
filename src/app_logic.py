@@ -7,6 +7,7 @@ from src.jellyfin_client import JellyfinClient
 from src.collection_recipes import RECIPES  # Assumes recipes are defined here
 import yaml
 import os
+from typing import List, Dict, Any, Optional
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,6 +32,7 @@ def main():
     parser.add_argument('--targets', type=str, default='auto', 
                       choices=['auto', 'all', 'emby', 'jellyfin'],
                       help='Sync targets: "auto" (use all available configs), "all" (require both), "emby" or "jellyfin"')
+    parser.add_argument('--custom_list', type=str, help='Path to a custom list file (JSON/YAML) for creating collections')
     
     # For backward compatibility
     parser.add_argument('--sync_emby', action='store_true', help=argparse.SUPPRESS)
@@ -108,6 +110,23 @@ def main():
         logger.error("No media server available for sync. Check your configuration and target selection.")
         sys.exit(1)
 
+    # Handle custom list if provided
+    if args.custom_list and os.path.exists(args.custom_list):
+        try:
+            custom_lists = load_custom_lists(args.custom_list)
+            if custom_lists and jellyfin:
+                logger.info(f"Processing {len(custom_lists)} custom lists from: {args.custom_list}")
+                
+                for custom_list in custom_lists:
+                    process_custom_list(custom_list, tmdb, jellyfin)
+            elif not jellyfin:
+                logger.warning("Cannot process custom lists: Jellyfin client not initialized")
+            elif not custom_lists:
+                logger.warning(f"No valid custom lists found in {args.custom_list}")
+        except Exception as e:
+            logger.error(f"Error processing custom list {args.custom_list}: {e}")
+
+    # Process standard TMDb collections from recipes
     for recipe in RECIPES:
         logger.info(f"Processing recipe: {recipe['name']}")
         # Fetch TMDb IDs based on recipe type
@@ -135,6 +154,7 @@ def main():
             continue
             
         logger.info(f"Found {len(tmdb_ids)} movies for '{recipe['name']}'")
+
         
         # Get artwork URLs for TMDb collections
         poster_url = None
@@ -234,6 +254,105 @@ def _sync_collection(server_client, collection_name, tmdb_ids):
     except Exception as e:
         logger.error(f"    Exception during syncing collection '{collection_name}': {e}")
         return None
+
+def load_custom_lists(file_path: str) -> List[Dict[str, Any]]:
+    """
+    Load custom lists from a YAML or JSON file.
+    
+    Args:
+        file_path: Path to the list file
+        
+    Returns:
+        List of custom list definitions
+    """
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            if file_path.endswith('.yaml') or file_path.endswith('.yml'):
+                return yaml.safe_load(f)
+            elif file_path.endswith('.json'):
+                import json
+                return json.load(f)
+            else:
+                logger.error(f"Unsupported file format: {file_path}. Use .yaml, .yml, or .json")
+                return []
+    except Exception as e:
+        logger.error(f"Failed to load custom lists from '{file_path}': {e}")
+        return []
+
+def process_custom_list(list_info: Dict[str, Any], tmdb_client: TmdbClient, jellyfin_client: JellyfinClient) -> None:
+    """
+    Process a custom list definition and create/update a Jellyfin collection.
+    
+    Args:
+        list_info: Dictionary containing list information
+        tmdb_client: TMDb client instance
+        jellyfin_client: Jellyfin client instance
+    """
+    try:
+        list_name = list_info.get('name')
+        list_id = list_info.get('list_id', str(hash(list_name)))  # Generate ID if not provided
+        description = list_info.get('description')
+        items = list_info.get('items', [])
+        clear_collection = list_info.get('clear_collection', False)
+        
+        if not list_name or not items:
+            logger.error("Custom list must have 'name' and 'items' properties")
+            return
+            
+        logger.info(f"Processing custom list: {list_name} with {len(items)} items")
+        
+        # Find or create the collection
+        collection_id = jellyfin_client.find_collection_with_name_or_create(
+            list_name,
+            list_id,
+            description,
+            'custom_list'
+        )
+        
+        if not collection_id:
+            logger.error(f"Failed to create collection for '{list_name}'")
+            return
+            
+        # Optionally clear the collection first
+        if clear_collection:
+            jellyfin_client.clear_collection(collection_id)
+            
+        # Process each item
+        matched_count = 0
+        for item in items:
+            # If item is just a TMDb ID (integer or string number)
+            if isinstance(item, (int, str)) and str(item).isdigit():
+                # Convert to a proper item dict with TMDb ID
+                item_info = {'id': int(item)}
+                # Try to get title and year from TMDb
+                movie_details = tmdb_client.get_movie_details(item_info['id'])
+                if movie_details:
+                    item_info['title'] = movie_details.get('title')
+                    if 'release_date' in movie_details and movie_details['release_date']:
+                        item_info['year'] = int(movie_details['release_date'][:4])
+            elif not isinstance(item, dict):
+                logger.warning(f"Skipping invalid item format: {item}")
+                continue
+            else:
+                # Item is already a dictionary
+                item_info = item
+                
+            # Add the item to the collection
+            if jellyfin_client.add_item_to_collection(collection_id, item_info):
+                matched_count += 1
+                
+        logger.info(f"Added {matched_count} of {len(items)} items to collection '{list_name}'")
+        
+        # Add a poster if needed
+        if not jellyfin_client.has_poster(collection_id):
+            logger.info(f"Generating poster for collection '{list_name}'")
+            if jellyfin_client.make_poster(collection_id, list_name):
+                logger.info("Successfully created poster")
+            else:
+                logger.warning("Failed to create poster")
+                
+    except Exception as e:
+        logger.error(f"Error processing custom list: {e}")
 
 if __name__ == '__main__':
     main()
