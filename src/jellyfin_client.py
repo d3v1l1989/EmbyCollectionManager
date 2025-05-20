@@ -291,6 +291,7 @@ class JellyfinClient(MediaServerClient):
         """
         Given a list of TMDb IDs, return the Jellyfin server's internal item IDs for owned movies.
         If collection_id is provided, items will be added to the collection incrementally in batches.
+        Collection size is limited to 500 movies maximum.
         
         Args:
             tmdb_ids: List of TMDb movie IDs.
@@ -299,273 +300,167 @@ class JellyfinClient(MediaServerClient):
             List of Jellyfin item IDs (str).
         """
         item_ids = []
+        
+        # Limit to 500 movies max
+        if len(tmdb_ids) > 500:
+            print(f"Limiting collection to 500 movies (from original {len(tmdb_ids)})")
+            tmdb_ids = tmdb_ids[:500]
+        
         total_to_find = len(tmdb_ids)
         print(f"Searching for {total_to_find} movies in Jellyfin library by TMDb IDs")
         
-        # Define batch size for TMDb ID search
-        # Jellyfin API appears to have a hard limit of 50 items per query
-        batch_size = 50  # Keep at 50 as Jellyfin seems to limit results to 50 per query
+        # Convert TMDb IDs to strings for EXACT comparison
+        # Create a set for O(1) lookup
+        tmdb_str_ids = set(str(tmdb_id) for tmdb_id in tmdb_ids)
         
-        # Track TMDb IDs that have been searched
-        searched_tmdb_ids = set()
+        # Add additional debug information 
+        if len(tmdb_str_ids) > 0:
+            sample_ids = list(tmdb_str_ids)[:5] 
+            print(f"Sample TMDb IDs we're looking for: {sample_ids}")
         
-        # First try the batched approach with AnyProviderIdEquals
+        # Track which items we've added to the collection for batch processing
+        batch_jellyfin_ids = []
+        
         try:
-            # Convert all TMDb IDs to strings and add 'tmdb.' prefix
-            # Process in much smaller batches to overcome the 50-item return limit
-            search_batch_size = 25  # Search fewer TMDb IDs per batch to get more total matches
-            max_batches = min(50, (len(tmdb_ids) + search_batch_size - 1) // search_batch_size)  # Process more batches but limit to reasonable number
+            # Get all movies and manually check TMDb IDs
+            # We need to paginate to get ALL movies in the library
+            params = {
+                'Recursive': 'true',
+                'IncludeItemTypes': 'Movie',
+                'Fields': 'ProviderIds,Path',
+                'Limit': 800,  # Get many more movies at once
+                'EnableTotalRecordCount': 'true'  # Get total count for pagination
+            }
             
-            # Track which TMDb IDs we've processed to avoid duplicates
-            processed_count = 0
-            progress_report_interval = max(1, max_batches // 10)  # Report progress at regular intervals
+            endpoint = f"/Users/{self.user_id}/Items"
             
-            # For large collections, we need to process many batches
-            print(f"Processing up to {max_batches} batches with {search_batch_size} TMDb IDs per batch")
+            # Set up pagination variables
+            start_index = 0
+            page_size = 800
+            total_items = 0
+            processed_items = 0
             
-            for batch_idx in range(max_batches):
-                # Get the next batch of TMDb IDs to search for
-                start_idx = batch_idx * search_batch_size
-                end_idx = min(start_idx + search_batch_size, len(tmdb_ids))
-                batch_tmdb_ids = tmdb_ids[start_idx:end_idx]
+            # First get total count of movies
+            count_params = dict(params)
+            count_params['Limit'] = 1
+            initial_data = self._make_api_request('GET', endpoint, params=count_params)
+            if initial_data and 'TotalRecordCount' in initial_data:
+                total_items = initial_data['TotalRecordCount']
+                print(f"Found total of {total_items} movies in Jellyfin library to scan for TMDb matches")
+            
+            # Log how many TMDb IDs we're looking for
+            print(f"Looking for {len(tmdb_str_ids)} unique TMDb IDs in library of {total_items} movies")
+            
+            # Now paginate through all movies in library
+            while True:
+                current_params = dict(params)
+                current_params['StartIndex'] = start_index
+                current_params['Limit'] = page_size
                 
-                if not batch_tmdb_ids:  # No more TMDb IDs to process
+                data = self._make_api_request('GET', endpoint, params=current_params)
+                
+                if not data or 'Items' not in data or not data['Items']:
                     break
                     
-                # Add these IDs to the set of searched IDs
-                for tmdb_id in batch_tmdb_ids:
-                    searched_tmdb_ids.add(str(tmdb_id))
+                page_items = len(data['Items'])
+                processed_items += page_items
+                print(f"Scanning {page_items} movies (page {start_index//page_size + 1}, {processed_items}/{total_items})")
                 
-                # Format the provider IDs string
-                tmdb_id_strings = [f"tmdb.{tmdb_id}" for tmdb_id in batch_tmdb_ids]
-                provider_ids_str = ",".join(tmdb_id_strings)
+                # Process the matches in this page
+                page_matches = 0
                 
-                # Only report progress at intervals for large batches
-                if batch_idx % progress_report_interval == 0 or batch_idx == max_batches - 1:
-                    print(f"Searching batch {batch_idx + 1}/{max_batches} with {len(batch_tmdb_ids)} TMDb IDs")
-                    
-                params = {
-                    'Recursive': 'true',
-                    'IncludeItemTypes': 'Movie',
-                    'Fields': 'ProviderIds,Path',
-                    'AnyProviderIdEquals': provider_ids_str,
-                    'Limit': 100  # Request more items than we expect to get
-                }
-                
-                endpoint = f"/Users/{self.user_id}/Items"
-                
-                # Make the API request to search for movies with these TMDb IDs
-                data = self._make_api_request('GET', endpoint, params=params)
-                
-                if data and 'Items' in data and data['Items']:
-                    batch_matches = len(data['Items'])
-                    
-                    # Track batch progress for larger collections
-                    processed_count += len(batch_tmdb_ids)
-                    progress_pct = (processed_count / len(tmdb_ids)) * 100 if tmdb_ids else 0
-                    
-                    # Create a set of existing IDs for faster lookup
-                    existing_ids = set(item_ids)
-                    
-                    # Track how many new movies we find with each batch
-                    new_in_batch = 0
-                    batch_item_ids = []
-                    
-                    # Process the matches - collect all the new IDs first
-                    for item in data['Items']:
-                        name = item.get('Name', '(unknown)')
-                        item_id = item['Id']
+                for item in data['Items']:
+                    if 'ProviderIds' in item:
+                        provider_ids = item['ProviderIds']
+                        # Flag to track if we found a match for this item
+                        found_match = False
                         
-                        # Only add the item if we haven't already found it
-                        if item_id not in existing_ids:  # Avoid duplicates
-                            batch_item_ids.append((item_id, name))
-                            existing_ids.add(item_id)  # Update the lookup set
+                        # Check for TMDb ID in any case format - ONLY EXACT STRING MATCHES
+                        for key in ['Tmdb', 'tmdb', 'TMDB']:
+                            if key in provider_ids:
+                                jellyfin_tmdb_id = str(provider_ids[key])  # Convert to string for comparison
+                                
+                                if jellyfin_tmdb_id in tmdb_str_ids:
+                                    # We found a matching TMDb ID
+                                    name = item.get('Name', '(unknown)')
+                                    item_id = item['Id']
+                                    
+                                    if item_id not in item_ids:  # Avoid duplicates
+                                        item_ids.append(item_id)
+                                        batch_jellyfin_ids.append(item_id)
+                                        page_matches += 1
+                                        
+                                        # Log the match
+                                        if len(item_ids) <= 50 or page_matches <= 5:  # Limit logging for large collections
+                                            print(f"  - Found match: {name} (ID: {item_id}) - TMDb ID: {jellyfin_tmdb_id}")
+                                    
+                                    found_match = True
+                                    break  # Break out of the key loop once we find a match
+                
+                # If collection_id is provided and we found matches, add this batch to the collection
+                if collection_id and batch_jellyfin_ids and len(batch_jellyfin_ids) >= 25:  # Add in batches of 25 or more
+                    print(f"Adding batch of {len(batch_jellyfin_ids)} items to collection...")
+                    self.add_batch_to_collection(collection_id, batch_jellyfin_ids)
+                    batch_jellyfin_ids = []  # Clear the batch after adding
+                
+                # Report progress for this page
+                if page_matches > 0:
+                    print(f"Found {page_matches} matches on this page (total: {len(item_ids)})")
+                
+                # If we got fewer items than requested, we've reached the end
+                if page_items < page_size:
+                    break
                     
-                    # Now add all new IDs to the master list
-                    new_in_batch = len(batch_item_ids)
-                    batch_jellyfin_ids = []
-                    
-                    for item_id, name in batch_item_ids:
-                        item_ids.append(item_id)
-                        batch_jellyfin_ids.append(item_id)
-                    
-                    # Report results for this batch
-                    if batch_idx % progress_report_interval == 0 or batch_idx == max_batches - 1 or new_in_batch > 0:
-                        print(f"Found {batch_matches} matches in batch {batch_idx + 1}/{max_batches}, added {new_in_batch} new items (total: {len(item_ids)})")
-                        
-                    # If collection_id is provided, add this batch to the collection immediately
-                    if collection_id and batch_jellyfin_ids:
-                        print(f"Adding batch of {len(batch_jellyfin_ids)} new items to collection...")
-                        self.add_batch_to_collection(collection_id, batch_jellyfin_ids)
-                    
-                    # Only log individual items for smaller collections or initial batches
-                    if len(item_ids) < 100 or batch_idx < 2:  # Limit logging for very large collections
-                        for item_id, name in batch_item_ids[:min(50, len(batch_item_ids))]:
-                            print(f"  - Found match: {name} (ID: {item_id})")
-                    
-                    # For large batches, just report summary
-                    elif new_in_batch > 0:
-                        print(f"  - Added {new_in_batch} new unique movies from this batch (total now: {len(item_ids)})")
-                        if new_in_batch > 0 and new_in_batch <= 5:
-                            # Show just a few examples when only a small number of new items were found
-                            for item_id, name in batch_item_ids:
-                                print(f"    - Added: {name} (ID: {item_id})")
-                        elif new_in_batch > 5:
-                            # Show a small sample of the new additions
-                            for item_id, name in batch_item_ids[:3]:
-                                print(f"    - Added: {name} (ID: {item_id})")
-                            print(f"    - ... and {new_in_batch - 3} more items")
-                elif batch_idx % progress_report_interval == 0 or batch_idx == max_batches - 1:
-                    print(f"No matches found in batch {batch_idx + 1}/{max_batches}")
-        except Exception as e:
-            print(f"Error searching by batched provider IDs: {e}")
-        
-        # This check ensures we're not returning early with just 100 matches
-        # If we have found a substantial number of movies and have processed most batches, skip the full scan
-        print(f"Batch processing complete. Found {len(item_ids)} total unique movies across all batches.")
-        
-        # Only use the library scan as a fallback if we found a very small percentage of what we expected
-        # Always do a full library scan if we found less than 20% of the expected matches
-        if len(item_ids) < total_to_find / 5:  # Less than 20% match rate
-            print(f"Only found {len(item_ids)} movies with batch method (out of {total_to_find} TMDb IDs), trying full library scan...")
+                # Move to next page
+                start_index += page_size
             
+            # Add any remaining items to the collection
+            if collection_id and batch_jellyfin_ids:
+                print(f"Adding final batch of {len(batch_jellyfin_ids)} items to collection...")
+                self.add_batch_to_collection(collection_id, batch_jellyfin_ids)
+                
+        except Exception as e:
+            print(f"Error scanning library with pagination: {e}")
+            
+            # Fall back to simple non-paginated scan with smaller limit
             try:
-                # Get all movies and manually check TMDb IDs
-                # We need to paginate to get ALL movies in the library
-                # This is critical for large libraries to match more TMDb IDs
-                params = {
+                print("Falling back to simple library scan without pagination...")
+                simple_params = {
                     'Recursive': 'true',
                     'IncludeItemTypes': 'Movie',
                     'Fields': 'ProviderIds,Path',
-                    'Limit': 800,  # Get many more movies at once
-                    'EnableTotalRecordCount': 'true'  # Get total count for pagination
+                    'Limit': 200  # Smaller but safer limit
                 }
                 
-                # Convert TMDb IDs to strings for EXACT comparison
-                # Create a set for O(1) lookup but add debug counting
-                tmdb_str_ids = set(str(tmdb_id) for tmdb_id in tmdb_ids)
-                
-                # Add additional debug information 
-                if len(tmdb_str_ids) > 0:
-                    sample_ids = list(tmdb_str_ids)[:5] 
-                    print(f"Sample TMDb IDs we're looking for: {sample_ids}")
-                
-                endpoint = f"/Users/{self.user_id}/Items"
-                
-                # Set up pagination variables
-                start_index = 0
-                page_size = 800
-                total_items = 0
-                processed_items = 0
-                
-                # First get total count of movies
-                count_params = dict(params)
-                count_params['Limit'] = 1
-                initial_data = self._make_api_request('GET', endpoint, params=count_params)
-                if initial_data and 'TotalRecordCount' in initial_data:
-                    total_items = initial_data['TotalRecordCount']
-                    print(f"Found total of {total_items} movies in Jellyfin library to scan for TMDb matches")
-                
-                # Log how many TMDb IDs we're looking for
-                print(f"Looking for {len(tmdb_str_ids)} unique TMDb IDs in library of {total_items} movies")
-                
-                # Now paginate through all movies in library
-                while True:
-                    current_params = dict(params)
-                    current_params['StartIndex'] = start_index
-                    current_params['Limit'] = page_size
+                simple_data = self._make_api_request('GET', endpoint, params=simple_params)
+                if simple_data and 'Items' in simple_data and simple_data['Items']:
+                    simple_count = len(simple_data['Items'])
+                    print(f"Scanning {simple_count} movies with simple method")
                     
-                    data = self._make_api_request('GET', endpoint, params=current_params)
-                    
-                    if not data or 'Items' not in data or not data['Items']:
-                        break
-                        
-                    page_items = len(data['Items'])
-                    processed_items += page_items
-                    print(f"Scanning {page_items} movies (page {start_index//page_size + 1}, {processed_items}/{total_items})")
-                    
-                    for item in data['Items']:
+                    for item in simple_data['Items']:
                         if 'ProviderIds' in item:
                             provider_ids = item['ProviderIds']
-                            # Flag to track if we found a match for this item
-                            found_match = False
-                            
-                            # Debug: Check if this item has tmdb provider info
-                            has_tmdb_id = False
-                            jellyfin_tmdb_id = None
-                            
-                            # Check for TMDb ID in any case format - ONLY EXACT STRING MATCHES
+                            # Check for TMDb ID in any case format
                             for key in ['Tmdb', 'tmdb', 'TMDB']:
                                 if key in provider_ids:
-                                    has_tmdb_id = True
-                                    jellyfin_tmdb_id = str(provider_ids[key])  # Convert to string for comparison
-                                    
-                                    # CRITICAL FIX: Use explicit set membership test on the exact string
+                                    jellyfin_tmdb_id = str(provider_ids[key])
                                     if jellyfin_tmdb_id in tmdb_str_ids:
-                                        # We found a matching TMDb ID
                                         name = item.get('Name', '(unknown)')
                                         item_id = item['Id']
-                                        print(f"Found match via scan: {name} (ID: {item_id}) - TMDb ID: {jellyfin_tmdb_id}")
+                                        print(f"Found match via simple scan: {name} (ID: {item_id})")
                                         if item_id not in item_ids:  # Avoid duplicates
                                             item_ids.append(item_id)
-                                        found_match = True
-                                        break  # Break out of the key loop once we find a match
-                            
-                            # Debug: If it has TMDb ID but no match, report this for the first few items
-                            if has_tmdb_id and not found_match and len(item_ids) < 100:  # Limit debugging output
-                                name = item.get('Name', '(unknown)')
-                                print(f"Movie has TMDb ID but NOT matched: {name} - TMDb ID: {jellyfin_tmdb_id}")
-                                                            
-                            # No need to check other keys if we already found a match
-                            if found_match:
-                                continue  # Continue to the next item
+                                            batch_jellyfin_ids.append(item_id)
+                                        break
                     
-                    # If we got fewer items than requested, we've reached the end
-                    if page_items < page_size:
-                        break
-                        
-                    # Move to next page
-                    start_index += page_size
-            except Exception as e:
-                print(f"Error scanning full library with pagination: {e}")
-                
-                # Fall back to simple non-paginated scan with smaller limit
-                try:
-                    print("Falling back to simple library scan without pagination...")
-                    simple_params = {
-                        'Recursive': 'true',
-                        'IncludeItemTypes': 'Movie',
-                        'Fields': 'ProviderIds,Path',
-                        'Limit': 200  # Smaller but safer limit
-                    }
-                    
-                    simple_data = self._make_api_request('GET', endpoint, params=simple_params)
-                    if simple_data and 'Items' in simple_data and simple_data['Items']:
-                        simple_count = len(simple_data['Items'])
-                        print(f"Scanning {simple_count} movies with simple method")
-                        
-                        for item in simple_data['Items']:
-                            if 'ProviderIds' in item:
-                                provider_ids = item['ProviderIds']
-                                # Check for TMDb ID in any case format
-                                for key in ['Tmdb', 'tmdb', 'TMDB']:
-                                    if key in provider_ids:
-                                        jellyfin_tmdb_id = str(provider_ids[key])
-                                        if jellyfin_tmdb_id in tmdb_str_ids:
-                                            name = item.get('Name', '(unknown)')
-                                            item_id = item['Id']
-                                            print(f"Found match via simple scan: {name} (ID: {item_id})")
-                                            if item_id not in item_ids:  # Avoid duplicates
-                                                item_ids.append(item_id)
-                                            break
-                except Exception as simple_e:
-                    print(f"Simple library scan also failed: {simple_e}")
-        else:
-            # We have a reasonable number of matches from batch method, skip the full scan
-            print(f"Batch method found {len(item_ids)} movies, which is sufficient. Skipping full library scan.")
-            return item_ids
+                    # Add any found items to the collection
+                    if collection_id and batch_jellyfin_ids:
+                        print(f"Adding batch of {len(batch_jellyfin_ids)} items to collection from simple scan...")
+                        self.add_batch_to_collection(collection_id, batch_jellyfin_ids)
+            except Exception as simple_e:
+                print(f"Simple library scan also failed: {simple_e}")
         
-        # If we still have very few movies, add some recent popular ones as a fallback
+        # If we still have very few movies, add some recent popular ones as fallback
         if len(item_ids) < 5:
             print("Found very few matches. Adding some recent popular movies as fallback...")
             try:
@@ -577,14 +472,22 @@ class JellyfinClient(MediaServerClient):
                     'Limit': 20
                 }
                 data = self._make_api_request('GET', endpoint, params=params)
+                
+                fallback_ids = []
                 if data and 'Items' in data:
                     for item in data['Items']:
                         if item['Id'] not in item_ids:  # Avoid duplicates
                             item_ids.append(item['Id'])
+                            fallback_ids.append(item['Id'])
                             print(f"Added fallback movie: {item.get('Name', '(unknown)')} (ID: {item['Id']})")
                             # Stop after we've added enough fallbacks
-                            if len(item_ids) >= 20:
+                            if len(fallback_ids) >= 20:
                                 break
+                
+                # Add fallback items to collection if needed
+                if collection_id and fallback_ids:
+                    print(f"Adding {len(fallback_ids)} fallback movies to collection...")
+                    self.add_batch_to_collection(collection_id, fallback_ids)
             except Exception as e:
                 print(f"Error adding fallback movies: {e}")
         
