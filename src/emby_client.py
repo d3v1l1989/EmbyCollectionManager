@@ -15,7 +15,8 @@ class EmbyClient(MediaServerClient):
         Returns:
             The collection ID (str) or None if not found/created.
         """
-        # Search for the collection by name
+        # Search for the collection by name - try several different search approaches
+        # First try exact match
         params = {
             'IncludeItemTypes': 'BoxSet',
             'Recursive': 'true',
@@ -31,65 +32,101 @@ class EmbyClient(MediaServerClient):
                     print(f"Found existing collection: {item['Name']} (ID: {item['Id']})")
                     return item['Id']
         
-        # Collection doesn't exist, create it using the method from forum post
-        # https://emby.media/community/index.php?/topic/114883-using-the-collections-api-to-create-a-new-collection/
-        print(f"Collection '{collection_name}' not found. Creating new collection...")
+        # Try more aggressive name search
+        params = {
+            'IncludeItemTypes': 'BoxSet',
+            'Recursive': 'true',
+            'Name': collection_name,  # Try direct name filter
+            'Fields': 'Name,Overview'
+        }
+        data = self._make_api_request('GET', endpoint, params=params)
+        if data and 'Items' in data:
+            for item in data['Items']:
+                if item.get('Name', '').lower() == collection_name.lower():
+                    print(f"Found existing collection through name filter: {item['Name']} (ID: {item['Id']})")
+                    return item['Id']
+        
+        # Let's try to find all collections and look for a match manually
+        params = {
+            'IncludeItemTypes': 'BoxSet',
+            'Recursive': 'true',
+            'SortBy': 'Name',
+            'SortOrder': 'Ascending',
+            'Limit': 200
+        }
+        
+        print(f"Searching all collections for a match...")
+        data = self._make_api_request('GET', endpoint, params=params)
+        
+        if data and 'Items' in data and data['Items']:
+            print(f"Found {len(data['Items'])} collections total")
+            for item in data['Items']:
+                if item.get('Name', '').lower() == collection_name.lower():
+                    print(f"Found collection in full listing: {item['Name']} (ID: {item['Id']})")
+                    return item['Id']
+        
+        # Collection doesn't exist, let's try the "get any library item" approach
+        print(f"Collection '{collection_name}' not found. Trying special creation method...")
+        
+        # First get a movie or TV show from the library to use as a starting point
+        params = {
+            'IncludeItemTypes': 'Movie',
+            'Recursive': 'true',
+            'Limit': 1
+        }
+        endpoint = f"/Users/{self.user_id}/Items"
+        item_data = self._make_api_request('GET', endpoint, params=params)
         
         try:
-            # The key insight is to use a POST request to /Collections with empty Ids parameter
-            # This API format follows the successful example from the Emby forum
-            url = f"{self.server_url}/Collections"
+            # Find a movie to use as a starting point for the collection
+            if item_data and 'Items' in item_data and item_data['Items']:
+                sample_item_id = item_data['Items'][0]['Id']
+                print(f"Found sample item with ID: {sample_item_id} to use for collection creation")
+                
+                # Try creating a collection with at least one item
+                try:
+                    # Format: /Collections?api_key=XXX&Name=CollectionName&Ids=123456
+                    url = f"{self.server_url}/Collections"
+                    
+                    params = {
+                        'api_key': self.api_key,
+                        'IsLocked': 'false',
+                        'Name': collection_name,
+                        'Ids': sample_item_id
+                    }
+                    
+                    print(f"Creating collection with sample item...")
+                    response = self.session.post(url, params=params, timeout=15)
+                    response.raise_for_status()
+                    
+                    if response.text and len(response.text) > 0:
+                        try:
+                            data = response.json()
+                            if data and 'Id' in data:
+                                print(f"Successfully created collection with ID: {data['Id']}")
+                                return data['Id']
+                        except Exception as e:
+                            print(f"Error parsing response: {e}")
+                except Exception as e:
+                    print(f"Error creating collection with item: {e}")
             
-            # Create empty ids list in URL format
-            empty_ids = ""
-            
-            # Prepare the query parameters
-            params = {
-                'api_key': self.api_key,
-                'IsLocked': 'false',
-                'Name': collection_name,
-                'Ids': empty_ids
-            }
-            
-            print(f"Using direct POST to /Collections endpoint...")
-            
-            # Make direct request instead of using the helper to handle URL parameters properly
-            response = self.session.post(url, params=params, timeout=15)
-            response.raise_for_status()
-            
-            # Parse the response
+            # If we couldn't create with a sample item, try another method
+            # Try creating collection through the BoxSet API end point
             try:
-                data = response.json()
+                print("Trying to create through BoxSet endpoint...")
+                endpoint = f"/Library/VirtualFolders/BoxSets"
+                payload = {
+                    'Name': collection_name
+                }
+                data = self._make_api_request('POST', endpoint, json=payload)
                 if data and 'Id' in data:
-                    print(f"Successfully created collection '{collection_name}' with ID: {data['Id']}")
+                    print(f"BoxSets endpoint worked! Created collection with ID: {data['Id']}")
                     return data['Id']
             except Exception as e:
-                print(f"Error parsing response: {e}")
-                
-            # If we get here, we couldn't create the collection the standard way
-            # Try the old approach as fallback with different URLs and parameters
-            print(f"Trying fallback methods to create collection...")
+                print(f"BoxSets endpoint failed: {e}")
             
-            # Try creating with URL-encoded parameters (different format)
-            try:
-                full_url = f"{self.server_url}/Collections?api_key={self.api_key}&IsLocked=false&Name={collection_name.replace(' ', '%20')}&Ids="
-                print(f"Trying direct URL: {full_url.replace(self.api_key, 'API_KEY_HIDDEN')}")
-                response = self.session.post(full_url, timeout=15)
-                response.raise_for_status()
-                
-                if response.text and len(response.text) > 0:
-                    try:
-                        data = response.json()
-                        if data and 'Id' in data:
-                            print(f"Fallback method worked! Created collection with ID: {data['Id']}")
-                            return data['Id']
-                    except Exception as e:
-                        print(f"Error parsing fallback response: {e}")
-            except Exception as e:
-                print(f"Fallback method failed: {e}")
-            
-            # If all else fails, we'll need a temporary ID to continue
-            print(f"Could not create collection. Using temporary ID for '{collection_name}'")
+            # If all else fails, we'll use a temp ID approach
+            print(f"All collection creation methods failed for '{collection_name}'")
             import hashlib
             temp_id = hashlib.md5(collection_name.encode()).hexdigest()
             self._temp_collections = getattr(self, '_temp_collections', {})
@@ -98,7 +135,7 @@ class EmbyClient(MediaServerClient):
             return temp_id
             
         except Exception as e:
-            print(f"Error creating collection '{collection_name}': {e}")
+            print(f"Error during collection creation process: {e}")
             return None
 
     def get_library_item_ids_by_tmdb_ids(self, tmdb_ids: List[int]) -> List[str]:
