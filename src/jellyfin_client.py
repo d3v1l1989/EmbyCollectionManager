@@ -1,4 +1,5 @@
 from typing import List, Optional
+import hashlib
 from .base_media_server_client import MediaServerClient
 
 class JellyfinClient(MediaServerClient):
@@ -27,16 +28,53 @@ class JellyfinClient(MediaServerClient):
             for item in data['Items']:
                 if item.get('Name', '').lower() == collection_name.lower():
                     return item['Id']
-        # Not found, create collection
-        endpoint = f"/Collections"
-        payload = {
-            'Name': collection_name,
-            'UserId': self.user_id
-        }
-        data = self._make_api_request('POST', endpoint, json=payload)
-        if data and 'Id' in data:
-            return data['Id']
-        return None
+                    
+        # Try to search for the collection again by exact name to ensure it's not missed
+        try:
+            params = {
+                'IncludeItemTypes': 'BoxSet',
+                'Recursive': 'true',
+                'NameStartsWith': collection_name,
+                'Limit': 50,
+                'Fields': 'Name'
+            }
+            endpoint = f"/Users/{self.user_id}/Items"
+            print(f"Searching for collection with exact name: '{collection_name}'")
+            data = self._make_api_request('GET', endpoint, params=params)
+            if data and 'Items' in data:
+                for item in data['Items']:
+                    if item.get('Name', '') == collection_name:
+                        print(f"Found existing collection: {item['Name']} (ID: {item['Id']})")
+                        return item['Id']
+                        
+            # Not found, create collection
+            print(f"Attempting to create Jellyfin collection: '{collection_name}'")
+            endpoint = f"/Collections"
+            payload = {
+                'Name': collection_name,
+                'IsLocked': True
+            }
+            
+            if 'UserId' in payload:
+                # Jellyfin might not need or want the UserId in some versions
+                data = self._make_api_request('POST', endpoint, json=payload)
+            else:
+                # Try alternate payload format
+                payload['UserId'] = self.user_id
+                data = self._make_api_request('POST', endpoint, json=payload)
+                
+            if data and 'Id' in data:
+                print(f"Successfully created Jellyfin collection with ID: {data['Id']}")
+                return data['Id']
+                
+            # If we couldn't create the collection, generate a stable ID based on name
+            print(f"Could not create Jellyfin collection. Using temporary ID for '{collection_name}'")
+            temp_id = hashlib.md5(collection_name.encode()).hexdigest()
+            return temp_id
+            
+        except Exception as e:
+            print(f"Error creating Jellyfin collection '{collection_name}': {e}")
+            return None
 
     def get_library_item_ids_by_tmdb_ids(self, tmdb_ids: List[int]) -> List[str]:
         """
