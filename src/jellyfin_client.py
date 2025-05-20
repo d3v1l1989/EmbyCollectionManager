@@ -257,7 +257,6 @@ class JellyfinClient(MediaServerClient):
                 # Convert TMDb IDs to strings for EXACT comparison
                 # Create a set for O(1) lookup but add debug counting
                 tmdb_str_ids = set(str(tmdb_id) for tmdb_id in tmdb_ids)
-                print(f"Looking for {len(tmdb_str_ids)} unique TMDb IDs in library of {total_items} movies")
                 
                 # Add additional debug information 
                 if len(tmdb_str_ids) > 0:
@@ -279,6 +278,9 @@ class JellyfinClient(MediaServerClient):
                 if initial_data and 'TotalRecordCount' in initial_data:
                     total_items = initial_data['TotalRecordCount']
                     print(f"Found total of {total_items} movies in Jellyfin library to scan for TMDb matches")
+                
+                # Log how many TMDb IDs we're looking for
+                print(f"Looking for {len(tmdb_str_ids)} unique TMDb IDs in library of {total_items} movies")
                 
                 # Now paginate through all movies in library
                 while True:
@@ -338,7 +340,39 @@ class JellyfinClient(MediaServerClient):
                     # Move to next page
                     start_index += page_size
             except Exception as e:
-                print(f"Error scanning full library: {e}")
+                print(f"Error scanning full library with pagination: {e}")
+                
+                # Fall back to simple non-paginated scan with smaller limit
+                try:
+                    print("Falling back to simple library scan without pagination...")
+                    simple_params = {
+                        'Recursive': 'true',
+                        'IncludeItemTypes': 'Movie',
+                        'Fields': 'ProviderIds,Path',
+                        'Limit': 200  # Smaller but safer limit
+                    }
+                    
+                    simple_data = self._make_api_request('GET', endpoint, params=simple_params)
+                    if simple_data and 'Items' in simple_data and simple_data['Items']:
+                        simple_count = len(simple_data['Items'])
+                        print(f"Scanning {simple_count} movies with simple method")
+                        
+                        for item in simple_data['Items']:
+                            if 'ProviderIds' in item:
+                                provider_ids = item['ProviderIds']
+                                # Check for TMDb ID in any case format
+                                for key in ['Tmdb', 'tmdb', 'TMDB']:
+                                    if key in provider_ids:
+                                        jellyfin_tmdb_id = str(provider_ids[key])
+                                        if jellyfin_tmdb_id in tmdb_str_ids:
+                                            name = item.get('Name', '(unknown)')
+                                            item_id = item['Id']
+                                            print(f"Found match via simple scan: {name} (ID: {item_id})")
+                                            if item_id not in item_ids:  # Avoid duplicates
+                                                item_ids.append(item_id)
+                                            break
+                except Exception as simple_e:
+                    print(f"Simple library scan also failed: {simple_e}")
         
         # If we still have very few movies, add some recent popular ones as a fallback
         if len(item_ids) < 5:
