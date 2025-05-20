@@ -75,8 +75,17 @@ class EmbyClient(MediaServerClient):
                             if data and 'Id' in data:
                                 print(f"Successfully created collection '{collection_name}' with ID: {data['Id']}")
                                 
-                                # We'll need to remove this sample item later
-                                print(f"Note: Will need to remove temporary item {sample_item_id} from collection later")
+                                # Remove this temporary item from the collection immediately
+                                try:
+                                    remove_url = f"{self.server_url}/Collections/{data['Id']}/Items?api_key={self.api_key}&Ids={sample_item_id}"
+                                    print(f"Removing temporary item {sample_item_id} from collection...")
+                                    remove_response = self.session.delete(remove_url, timeout=15)
+                                    if remove_response.status_code == 204:
+                                        print(f"Successfully removed temporary item from collection")
+                                    else:
+                                        print(f"Note: Could not remove temporary item {sample_item_id} (status: {remove_response.status_code})")
+                                except Exception as e:
+                                    print(f"Error removing temporary item: {e}")
                                 
                                 return data['Id']
                         except Exception as e:
@@ -208,35 +217,49 @@ class EmbyClient(MediaServerClient):
         # Update poster if provided
         if poster_url:
             try:
-                # First inform Emby about the image URL
-                endpoint = f"/Items/{collection_id}/RemoteImages/Download"
-                params = {
+                # Make a direct request instead of using _make_api_request
+                # This is because Emby returns 204 No Content which isn't valid JSON
+                url = f"{self.server_url}/Items/{collection_id}/RemoteImages/Download?api_key={self.api_key}"
+                payload = {
                     "Type": "Primary",  # Primary = poster in Emby
                     "ImageUrl": poster_url,
                     "ProviderName": "TMDb"
                 }
                 print(f"Updating poster for collection {collection_id}")
-                data = self._make_api_request('POST', endpoint, params=params)
-                if data is not None:
+                
+                # Use direct API call instead of the helper which expects JSON back
+                response = self.session.post(url, json=payload, timeout=15)
+                
+                # 204 is success with no content
+                if response.status_code in [200, 204]:
                     success = True
-                    print("Poster update successful")
+                    print(f"Poster update successful (status: {response.status_code})")
+                else:
+                    print(f"Failed to update poster (status: {response.status_code})")
             except Exception as e:
                 print(f"Error updating collection poster: {e}")
                 
         # Update backdrop if provided
         if backdrop_url:
             try:
-                endpoint = f"/Items/{collection_id}/RemoteImages/Download"
-                params = {
+                # Make a direct request instead of using _make_api_request
+                url = f"{self.server_url}/Items/{collection_id}/RemoteImages/Download?api_key={self.api_key}"
+                payload = {
                     "Type": "Backdrop",  # Backdrop/fanart
                     "ImageUrl": backdrop_url,
                     "ProviderName": "TMDb"
                 }
                 print(f"Updating backdrop for collection {collection_id}")
-                data = self._make_api_request('POST', endpoint, params=params)
-                if data is not None:
+                
+                # Use direct API call instead of the helper which expects JSON back
+                response = self.session.post(url, json=payload, timeout=15)
+                
+                # 204 is success with no content
+                if response.status_code in [200, 204]:
                     success = True
-                    print("Backdrop update successful")
+                    print(f"Backdrop update successful (status: {response.status_code})")
+                else:
+                    print(f"Failed to update backdrop (status: {response.status_code})")
             except Exception as e:
                 print(f"Error updating collection backdrop: {e}")
                 
