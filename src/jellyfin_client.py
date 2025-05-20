@@ -239,9 +239,14 @@ class JellyfinClient(MediaServerClient):
         except Exception as e:
             print(f"Error searching by batched provider IDs: {e}")
         
-        # If we didn't find many matches, try the direct approach using all movies
-        if len(item_ids) < total_to_find / 10:  # If we found less than 10% of movies
-            print(f"Only found {len(item_ids)} movies with batch method, trying full library scan...")
+        # Only use the full library scan if we found a very small percentage of movies
+        # and if we searched for a large number of movies to begin with
+        if len(item_ids) < 100 and total_to_find > 500 and (len(item_ids) < total_to_find / 20):  # Very low match rate
+            print(f"Only found {len(item_ids)} movies with batch method (out of {total_to_find} TMDb IDs), trying full library scan...")
+        else:
+            # We have a reasonable number of matches from batch method, skip the full scan
+            print(f"Batch method found {len(item_ids)} movies, which is sufficient. Skipping full library scan.")
+            return item_ids
             try:
                 # Get all movies and manually check TMDb IDs
                 # We need to paginate to get ALL movies in the library
