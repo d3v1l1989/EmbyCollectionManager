@@ -396,7 +396,7 @@ class EmbyClient(MediaServerClient):
 
     def _set_item_sort_names(self, ordered_item_ids: List[str]) -> bool:
         """
-        Set the SortName property for each item in the provided list based on its position.
+        Set items' sort order using IndexNumber (explicit sort index) instead of SortName.
         Args:
             ordered_item_ids: List of Emby item IDs in the desired final sort order.
         Returns:
@@ -412,13 +412,12 @@ class EmbyClient(MediaServerClient):
         for index, item_id in enumerate(ordered_item_ids):
             item_name_for_log = item_name_map.get(item_id, f"Item {item_id}") # Fallback name
             
-            # Create a sortable prefix (e.g., "001_", "002_")
-            prefix = f"{index + 1:03d}_" # Using underscore as separator
-            target_sort_name = f"{prefix}{item_name_for_log}"
+            # Use the position directly as the sort index
+            # In Emby, lower IndexNumber = earlier in sort order
+            sort_index = index + 1
             
             try:
-                # REVISED APPROACH: Get item data with user context path
-                # Based on error logs, /Items/{id} doesn't work, but user-specific path does
+                # Get the existing item data
                 item_data_url = f"/Users/{self.user_id}/Items/{item_id}"
                 item_data = self._make_api_request('GET', item_data_url)
                 
@@ -427,47 +426,62 @@ class EmbyClient(MediaServerClient):
                     all_successful = False
                     continue
                     
-                # Create a full payload starting with the existing item data
-                # This ensures we don't miss any required fields
-                update_payload = item_data.copy()
+                # Create a minimal payload to update just the critical fields
+                # Using a minimal payload reduces risk of conflicts
+                update_payload = {
+                    "Id": item_id,
+                    "IndexNumber": sort_index,  # This is the key field for sort order
+                    "LockedFields": []         # Ensure fields aren't locked
+                }
                 
-                # Set the SortName properties
-                update_payload["SortName"] = target_sort_name
-                update_payload["ForcedSortName"] = target_sort_name
-                
-                # Make sure data isn't locked
-                update_payload["LockedFields"] = [] # Explicitly unlock all fields
-                if "LockData" in update_payload:
-                    update_payload["LockData"] = False
+                # If we need additional fields required by the API, include them
+                for field in ['Name', 'Path', 'Type', 'SourceType']:
+                    if field in item_data:
+                        update_payload[field] = item_data[field]
                         
-                # POST directly to the /Items/ endpoint (no user path)
-                direct_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
-                response = self.session.post(direct_url, json=update_payload, timeout=15)
+                # POST the update
+                update_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
+                response = self.session.post(update_url, json=update_payload, timeout=15)
                 
                 # Check response status code
                 if response.status_code not in [200, 204]:
-                    logger.error(f"Failed to set SortName for {item_name_for_log}. Status: {response.status_code} - {response.text[:100]}")
+                    logger.error(f"Failed to set IndexNumber for {item_name_for_log}. Status: {response.status_code} - {response.text[:100]}")
                     all_successful = False
                     continue
                     
-                # VERIFY update actually worked by getting the item again
+                # VERIFY update actually worked
                 verify_data = self._make_api_request('GET', f"/Users/{self.user_id}/Items/{item_id}")
-                actual_sort_name = verify_data.get('SortName') if verify_data else None
-                if actual_sort_name != target_sort_name:
-                    logger.error(f"SortName verification failed for {item_name_for_log}! Expected '{target_sort_name}', got '{actual_sort_name}'")
+                actual_index = verify_data.get('IndexNumber') if verify_data else None
+                if actual_index != sort_index:
+                    logger.error(f"IndexNumber verification failed for {item_name_for_log}! Expected '{sort_index}', got '{actual_index}'")
                     all_successful = False
                 else:
-                    logger.info(f"Verified SortName: {target_sort_name} for {item_name_for_log} (ID: {item_id})")
-                    
-                # FINAL APPROACH: Try a direct database-level metadata refresh to ensure changes propagate
+                    logger.info(f"Set sort index: {sort_index} for {item_name_for_log} (ID: {item_id})")
+                
+                # Update the ParentIndexNumber as well for completeness (used in some views)
+                if 'ParentIndexNumber' in item_data or actual_index is not None:
+                    parent_update = {
+                        "Id": item_id,
+                        "ParentIndexNumber": 1  # Set all to same season/parent
+                    }
+                    # Add required fields
+                    for field in ['Name', 'Path', 'Type', 'SourceType']:
+                        if field in item_data:
+                            parent_update[field] = item_data[field]
+                            
+                    parent_response = self.session.post(update_url, json=parent_update, timeout=15)
+                    if parent_response.status_code not in [200, 204]:
+                        logger.warning(f"Failed to set ParentIndexNumber for {item_name_for_log}.")
+                
+                # Trigger a metadata refresh to ensure changes propagate
                 refresh_url = f"{self.server_url}/Items/{item_id}/Refresh?Recursive=false&MetadataRefreshMode=FullRefresh&api_key={self.api_key}"
                 refresh_response = self.session.post(refresh_url, timeout=15)
                 
                 if refresh_response.status_code not in [200, 204]:
                     logger.warning(f"Item refresh request failed for {item_name_for_log}: {refresh_response.status_code}")
-                    
+            
             except Exception as e:
-                logger.error(f"Exception setting SortName for {item_name_for_log} (ID: {item_id}): {e}")
+                logger.error(f"Exception setting sort index for {item_name_for_log} (ID: {item_id}): {e}")
                 all_successful = False
                 
         return all_successful
