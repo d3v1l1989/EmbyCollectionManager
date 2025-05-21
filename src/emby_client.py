@@ -333,8 +333,14 @@ class EmbyClient(MediaServerClient):
                     collection_metadata_payload = collection_data.copy()
                     
                     # Set the DisplayOrder to ProductionYear in descending order
+                    # Make sure all relevant fields are included and formatted correctly
                     collection_metadata_payload["DisplayOrder"] = "ProductionYear"
                     collection_metadata_payload["SortOrder"] = "Descending"
+                    
+                    # Ensure other sorting-related fields are properly set
+                    collection_metadata_payload["SortBy"] = "ProductionYear,SortName"  # Backup sort by name
+                    collection_metadata_payload["SortByPremiereDate"] = False
+                    collection_metadata_payload["SortByPremiereFirst"] = False
                     
                     # Ensure LockedFields allows DisplayOrder to be changed
                     locked_fields = collection_metadata_payload.get('LockedFields') if isinstance(collection_metadata_payload.get('LockedFields'), list) else []
@@ -421,24 +427,24 @@ class EmbyClient(MediaServerClient):
         if not collection_id:
             return False
             
+        # Import quote function for URL encoding
+        from urllib.parse import quote
+        
         # Update poster if provided
         if poster_url:
             try:
-                # Make a direct request instead of using _make_api_request
-                # This is because Emby returns 204 No Content which isn't valid JSON
-                url = f"{self.server_url}/Items/{collection_id}/RemoteImages/Download?api_key={self.api_key}"
-                payload = {
-                    "Type": "Primary",  # Primary = poster in Emby
-                    "ImageUrl": poster_url,
-                    "ProviderName": "TMDb", # Or any other provider name, it's informational
-                    "EnableImageEnhancers": "false"  # Prevent Emby from trying to enhance/modify the image
-                }
-                logger.info(f"Updating poster for collection {collection_id}")
+                # Ensure the URL is properly encoded
+                encoded_url = quote(poster_url, safe='')
                 
-                # Use direct API call instead of the helper which expects JSON back
-                response = self.session.post(url, json=payload, timeout=15)
+                # Build direct URL with all parameters included
+                base_url = f"{self.server_url}/Items/{collection_id}/RemoteImages/Download"
+                url_with_params = f"{base_url}?api_key={self.api_key}&Type=Primary&ImageUrl={encoded_url}&ProviderName=TMDb&EnableImageEnhancers=false"
                 
-                # 204 is success with no content
+                logger.info(f"Updating poster for collection {collection_id} using direct URL method")
+                
+                # Make direct request - no JSON payload needed
+                response = self.session.post(url_with_params, timeout=30)
+                
                 if response.status_code in [200, 204]:
                     success = True
                     logger.info(f"Poster update successful (status: {response.status_code})")
@@ -450,20 +456,18 @@ class EmbyClient(MediaServerClient):
         # Update backdrop if provided
         if backdrop_url:
             try:
-                # Make a direct request instead of using _make_api_request
-                url = f"{self.server_url}/Items/{collection_id}/RemoteImages/Download?api_key={self.api_key}"
-                payload = {
-                    "Type": "Backdrop",  # Backdrop/fanart
-                    "ImageUrl": backdrop_url,
-                    "ProviderName": "TMDb",
-                    "EnableImageEnhancers": "false"  # Prevent Emby from trying to enhance/modify the image
-                }
-                logger.info(f"Updating backdrop for collection {collection_id}")
+                # Ensure the URL is properly encoded
+                encoded_url = quote(backdrop_url, safe='')
                 
-                # Use direct API call instead of the helper which expects JSON back
-                response = self.session.post(url, json=payload, timeout=15)
+                # Build direct URL with all parameters included
+                base_url = f"{self.server_url}/Items/{collection_id}/RemoteImages/Download"
+                url_with_params = f"{base_url}?api_key={self.api_key}&Type=Backdrop&ImageUrl={encoded_url}&ProviderName=TMDb&EnableImageEnhancers=false"
                 
-                # 204 is success with no content
+                logger.info(f"Updating backdrop for collection {collection_id} using direct URL method")
+                
+                # Make direct request - no JSON payload needed
+                response = self.session.post(url_with_params, timeout=30)
+                
                 if response.status_code in [200, 204]:
                     success = True
                     logger.info(f"Backdrop update successful (status: {response.status_code})")
