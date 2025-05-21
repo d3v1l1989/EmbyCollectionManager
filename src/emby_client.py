@@ -429,21 +429,16 @@ class EmbyClient(MediaServerClient):
             
         # Update poster if provided
         if poster_url:
+            logger.info(f"Attempting to set poster for {collection_id} with URL: {poster_url}")
             try:
-                # Make a direct request instead of using _make_api_request
-                # This is because Emby returns 204 No Content which isn't valid JSON
                 url = f"{self.server_url}/Items/{collection_id}/RemoteImages/Download?api_key={self.api_key}"
                 payload = {
-                    "Type": "Primary",  # Primary = poster in Emby
+                    "Type": "Primary",
                     "ImageUrl": poster_url,
-                    "ProviderName": "TMDb" # Or any other provider name, it's informational
+                    "ProviderName": "TMDb"
                 }
                 logger.info(f"Updating poster for collection {collection_id}")
-                
-                # Use direct API call instead of the helper which expects JSON back
                 response = self.session.post(url, json=payload, timeout=15)
-                
-                # 204 is success with no content
                 if response.status_code in [200, 204]:
                     success = True
                     logger.info(f"Poster update successful (status: {response.status_code})")
@@ -451,23 +446,19 @@ class EmbyClient(MediaServerClient):
                     logger.error(f"Failed to update poster (status: {response.status_code}) - {response.text}")
             except Exception as e:
                 logger.error(f"Error updating collection poster: {e}")
-                
+            
         # Update backdrop if provided
         if backdrop_url:
+            logger.info(f"Attempting to set backdrop for {collection_id} with URL: {backdrop_url}")
             try:
-                # Make a direct request instead of using _make_api_request
                 url = f"{self.server_url}/Items/{collection_id}/RemoteImages/Download?api_key={self.api_key}"
                 payload = {
-                    "Type": "Backdrop",  # Backdrop/fanart
+                    "Type": "Backdrop",
                     "ImageUrl": backdrop_url,
                     "ProviderName": "TMDb"
                 }
                 logger.info(f"Updating backdrop for collection {collection_id}")
-                
-                # Use direct API call instead of the helper which expects JSON back
                 response = self.session.post(url, json=payload, timeout=15)
-                
-                # 204 is success with no content
                 if response.status_code in [200, 204]:
                     success = True
                     logger.info(f"Backdrop update successful (status: {response.status_code})")
@@ -475,8 +466,36 @@ class EmbyClient(MediaServerClient):
                     logger.error(f"Failed to update backdrop (status: {response.status_code}) - {response.text}")
             except Exception as e:
                 logger.error(f"Error updating collection backdrop: {e}")
-                
+            
         return success
+
+    def get_all_collections_sorted_by_year(self) -> List[Dict[str, Any]]:
+        """
+        Get all collections (BoxSets) from the Emby server, sorted by PremiereDate (ascending).
+
+        Returns:
+            List of collection items (dictionaries) or an empty list if an error occurs or no collections are found.
+        """
+        logger.info("Fetching all collections sorted by year...")
+        params = {
+            'IncludeItemTypes': 'BoxSet',
+            'Recursive': 'true',
+            'Fields': 'Name,PremiereDate,ProductionYear,SortName', # Requesting relevant fields
+            'SortBy': 'PremiereDate', # Sorting by premiere date
+            'SortOrder': 'Descending',
+            # 'Limit': 1000 # Optional: Add a limit if there's a very large number of collections
+        }
+        endpoint = f"/Users/{self.user_id}/Items"
+        
+        data = self._make_api_request('GET', endpoint, params=params)
+        
+        if data and 'Items' in data:
+            collections = data['Items']
+            logger.info(f"Successfully fetched {len(collections)} collections sorted by year.")
+            return collections
+        else:
+            logger.warning("No collections found or an error occurred while fetching collections.")
+            return []
 
     def _make_api_request(self, method: str, endpoint: str, params: Optional[Dict[str, Any]] = None,
                           json_data: Optional[Dict[str, Any]] = None, **kwargs) -> Optional[Dict[str, Any]]:
