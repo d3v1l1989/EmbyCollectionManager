@@ -149,7 +149,8 @@ class JellyfinClient(MediaServerClient):
                     'IncludeItemTypes': 'Movie',
                     'Fields': 'ProviderIds,Path',
                     'AnyProviderIdEquals': provider_ids_str,
-                    'Limit': batch_size
+                    'Limit': total_to_find,  # Allow more results per batch query
+                    '_cb': uuid.uuid4().hex  # Cache buster
                 }
                 
                 endpoint = f"/Users/{self.user_id}/Items"
@@ -163,7 +164,7 @@ class JellyfinClient(MediaServerClient):
                     for item in data['Items']:
                         name = item.get('Name', '(unknown)')
                         item_id = item['Id']
-                        print(f"  - Found match: {name} (ID: {item_id})")
+                        # print(f"  - Found match: {name} (ID: {item_id})") # Commented out for cleaner logs
                         if item_id not in all_found_ids:  # Avoid duplicates across batches
                             all_found_ids.add(item_id)
                             item_ids.append(item_id)
