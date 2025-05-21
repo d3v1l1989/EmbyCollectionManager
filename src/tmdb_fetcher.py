@@ -112,6 +112,30 @@ class TmdbClient:
             return None
         return f"{self.IMAGE_BASE_URL}/{size}{path}"
 
+    def get_collection_movies(self, collection_id, limit=None):
+        """
+        Fetch the list of movies in a TMDb collection.
+        
+        Args:
+            collection_id: TMDb collection ID
+            limit: Maximum number of movies to return (None for all)
+            
+        Returns:
+            List of movie dicts from the collection
+        """
+        collection_data = self.get_tmdb_series_collection_details(collection_id)
+        if not collection_data or 'parts' not in collection_data:
+            self.logger.error(f"Failed to get movies for collection {collection_id}")
+            return []
+            
+        # Return all movies or limit to the specified number
+        movies = collection_data.get('parts', [])
+        if limit and len(movies) > limit:
+            movies = movies[:limit]
+            
+        self.logger.info(f"Found {len(movies)} movies in collection {collection_id}")
+        return movies
+
     def get_artwork_for_collection(self, collection_data):
         """
         Extract poster and backdrop URLs from collection data.
