@@ -337,9 +337,12 @@ class EmbyClient(MediaServerClient):
                     collection_metadata_payload["SortOrder"] = "Descending"
                     collection_metadata_payload["SortBy"] = "PremiereDate"
                     
-                    # These might be redundant if SortBy is PremiereDate, but set for clarity or older Emby versions
-                    collection_metadata_payload["SortByPremiereDate"] = False 
-                    collection_metadata_payload["SortByPremiereFirst"] = False
+                    # Auxiliary sort fields (SortByPremiereDate, SortByPremiereFirst) removed 
+                    # to rely on core DisplayOrder, SortOrder, and SortBy fields.
+                    if "SortByPremiereDate" in collection_metadata_payload:
+                        del collection_metadata_payload["SortByPremiereDate"]
+                    if "SortByPremiereFirst" in collection_metadata_payload:
+                        del collection_metadata_payload["SortByPremiereFirst"]
                     
                     # Ensure LockedFields allows DisplayOrder and SortBy to be changed
                     locked_fields = collection_metadata_payload.get('LockedFields') if isinstance(collection_metadata_payload.get('LockedFields'), list) else []
