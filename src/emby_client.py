@@ -463,19 +463,29 @@ class EmbyClient(MediaServerClient):
                     logger.info(f"Set sort index: {sort_index} for {item_name_for_log} (ID: {item_id})")
                 
                 # Update the ParentIndexNumber as well for completeness (used in some views)
-                if 'ParentIndexNumber' in item_data or actual_index is not None:
+                try:
+                    # Use the same comprehensive approach as for IndexNumber - include all required fields
                     parent_update = {
                         "Id": item_id,
-                        "ParentIndexNumber": 1  # Set all to same season/parent
+                        "ParentIndexNumber": 1,  # Set all to same season/parent
+                        "LockedFields": [],      # Ensure fields aren't locked
+                        # Make sure required fields are always included
+                        "Name": item_data.get('Name', item_name_for_log),
+                        "SourceType": item_data.get('SourceType', 'Library'),  # Default to Library if not present
+                        "Type": item_data.get('Type', 'Movie'),                 # Default to Movie if not present
+                        "IndexNumber": sort_index  # Keep the sort index we just set
                     }
-                    # Add required fields
-                    for field in ['Name', 'Path', 'Type', 'SourceType']:
+                    
+                    # Include other essential fields that might be required
+                    for field in ['Path', 'MediaType', 'MediaSources', 'ProviderIds']:
                         if field in item_data:
                             parent_update[field] = item_data[field]
                             
                     parent_response = self.session.post(update_url, json=parent_update, timeout=15)
                     if parent_response.status_code not in [200, 204]:
-                        logger.warning(f"Failed to set ParentIndexNumber for {item_name_for_log}.")
+                        logger.warning(f"Failed to set ParentIndexNumber for {item_name_for_log}. Status: {parent_response.status_code} - {parent_response.text[:100]}")
+                except Exception as e:
+                    logger.warning(f"Exception setting ParentIndexNumber for {item_name_for_log}: {e}")
                 
                 # Trigger a metadata refresh to ensure changes propagate
                 refresh_url = f"{self.server_url}/Items/{item_id}/Refresh?Recursive=false&MetadataRefreshMode=FullRefresh&api_key={self.api_key}"
