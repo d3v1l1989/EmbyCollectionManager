@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 import logging
 import requests
@@ -342,10 +342,10 @@ class EmbyClient(MediaServerClient):
                     if collection_response.status_code == 200:
                         collection_data = collection_response.json()
                         
-                        # Update the collection to use sorting by release date
+                        # Update the collection to use sorting by SortName instead of year
                         update_data = {
                             "Id": collection_id,
-                            "CollectionSortOrder": "PremiereDate"
+                            "CollectionSortOrder": "SortName"
                         }
                         
                         update_url = f"{self.server_url}/Items/{collection_id}?api_key={self.api_key}"
@@ -353,6 +353,10 @@ class EmbyClient(MediaServerClient):
                         
                         if update_response.status_code in [200, 204]:
                             print("Successfully updated collection sort order")
+                            
+                            # Now set the SortName for each item based on its position
+                            # This is crucial for making the custom sort order work
+                            self._set_item_sort_names(collection_id, item_ids)
                         else:
                             print(f"Note: Could not update collection sort order: {update_response.status_code}")
                 except Exception as e:
@@ -375,6 +379,160 @@ class EmbyClient(MediaServerClient):
             print(f"Error updating collection items: {e}")
             return False
 
+    def set_collection_display_order(self, collection_id: str) -> bool:
+        """
+        Set the display order property of a collection to 'SortName'
+        so that items will be sorted according to their SortName values.
+        
+        Args:
+            collection_id: The Emby collection ID
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Emby API endpoint to update item properties
+            url = f"{self.server_url}/Items/{collection_id}/DisplayPreferences?api_key={self.api_key}&userId={self.user_id}"
+            
+            # First get current display preferences
+            response = self.session.get(url, timeout=15)
+            if response.status_code != 200:
+                print(f"Failed to get display preferences: {response.status_code}")
+                return False
+                
+            prefs = response.json()
+            
+            # Update the DisplayOrder setting
+            prefs["SortBy"] = "SortName"
+            prefs["RememberSorting"] = True
+            
+            # Save updated preferences
+            response = self.session.post(url, json=prefs, timeout=15)
+            
+            if response.status_code in [200, 204]:
+                print(f"Successfully set collection display order to SortName")
+                return True
+            else:
+                print(f"Failed to set collection display order: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            print(f"Error setting collection display order: {e}")
+            return False
+    
+    def set_collection_items_sort_order(self, collection_id: str, item_ids: List[str]) -> bool:
+        """
+        Sets the SortName property for each item in the collection to ensure they appear
+        in the order specified by the item_ids list.
+        
+        Args:
+            collection_id: The Emby collection ID
+            item_ids: List of Emby item IDs in the desired order
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Get collection items with their current names
+            url = f"{self.server_url}/Items?api_key={self.api_key}&userId={self.user_id}&"
+            url += f"ParentId={collection_id}&Fields=Name,SortName&Recursive=true"
+            
+            response = self.session.get(url, timeout=15)
+            if response.status_code != 200:
+                print(f"Failed to get collection items: {response.status_code}")
+                return False
+                
+            collection_items = response.json()
+            if not collection_items.get('Items'):
+                print("No items found in collection")
+                return False
+                
+            # Create a mapping of item IDs to their existing data
+            item_data = {item['Id']: item for item in collection_items.get('Items', [])}
+            
+            success = True
+            # Set SortName for each item based on its position in the item_ids list
+            for index, item_id in enumerate(item_ids):
+                if item_id not in item_data:
+                    print(f"Item ID {item_id} not found in collection")
+                    continue
+                    
+                # Create a sortable prefix with leading zeros (001, 002, etc.)
+                # This ensures proper numeric sorting
+                prefix = f"{index+1:03d}-"
+                
+                # Get the item's current name to use as base
+                item_name = item_data[item_id].get('Name', '')
+                
+                # Set the sort name with the prefix
+                sort_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
+                payload = {
+                    "SortName": f"{prefix}{item_name}"
+                }
+                
+                response = self.session.post(sort_url, json=payload, timeout=15)
+                if response.status_code not in [200, 204]:
+                    print(f"Failed to set sort name for {item_name}: {response.status_code}")
+                    success = False
+                    
+            return success
+                
+        except Exception as e:
+            print(f"Error setting collection items sort order: {e}")
+            return False
+    
+    def _set_item_sort_names(self, collection_id: str, item_ids: List[str]) -> bool:
+        """
+        Set the SortName property for each item in the collection based on its position in the item_ids list.
+        This ensures items appear in the exact order specified in item_ids rather than by year or name.
+        
+        Args:
+            collection_id: The Emby collection ID
+            item_ids: List of Emby item IDs in the desired order
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Get name information for all items
+            item_names = self.get_item_names_by_ids(item_ids)
+            if not item_names:
+                print("Could not get item names for sorting")
+                return False
+                
+            # Set a sort name for each item based on its position
+            success = True
+            for index, item_id in enumerate(item_ids):
+                if item_id not in item_names:
+                    continue
+                    
+                # Create a sortable prefix with leading zeros (e.g., 001-, 002-)
+                # This ensures numeric sorting in the exact order we want
+                prefix = f"{index+1:03d}-"
+                
+                # Use the item's name as the base
+                item_name = item_names[item_id]
+                
+                # Construct the API request to update SortName
+                sort_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
+                payload = {
+                    "Id": item_id,
+                    "ForcedSortName": f"{prefix}{item_name}"
+                }
+                
+                response = self.session.post(sort_url, json=payload, timeout=15)
+                if response.status_code not in [200, 204]:
+                    print(f"Failed to set sort name for {item_name}: {response.status_code}")
+                    success = False
+                else:
+                    print(f"Set sort order: {prefix}{item_name} for item {item_id}")
+                    
+            return success
+                
+        except Exception as e:
+            print(f"Error setting item sort names: {e}")
+            return False
+    
     def update_collection_artwork(self, collection_id: str, poster_url: Optional[str]=None, backdrop_url: Optional[str]=None) -> bool:
         """
         Update artwork for an Emby collection using external image URLs.
