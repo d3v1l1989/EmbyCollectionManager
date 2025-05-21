@@ -102,34 +102,49 @@ def main():
             if not collection_name:
                 logger.warning(f"Skipping recipe without a name: {recipe}")
                 continue
-        # For each target server based on configured targets, sync collection
-        recipe_targets = recipe.get('target_servers', ['emby', 'jellyfin'])
-        
-        # If Emby is enabled and the recipe targets Emby, sync to Emby
-        if emby and ('emby' in recipe_targets):
-            try:
-                collection_id = _sync_collection(emby, recipe['name'], tmdb_ids)
-                if collection_id and (poster_url or backdrop_url):
-                    logger.info(f"Updating artwork for Emby collection '{recipe['name']}'")
-                    if emby.update_collection_artwork(collection_id, poster_url, backdrop_url):
-                        logger.info(f"Successfully updated artwork for Emby collection '{recipe['name']}'")
-                    else:
-                        logger.warning(f"Failed to update artwork for Emby collection '{recipe['name']}'")
-            except Exception as e:
-                logger.error(f"Error syncing '{recipe['name']}' to Emby: {e}")
                 
-        # If Jellyfin is enabled and the recipe targets Jellyfin, sync to Jellyfin
-        if jellyfin and ('jellyfin' in recipe_targets):
+            logger.info(f"Processing collection: {collection_name}")
+            tmdb_ids = []
+            
+            # Get movie IDs based on source type
+            if source_type == 'tmdb_collection' or source_type == 'tmdb_series_collection':
+                if not tmdb_collection_id:
+                    logger.warning(f"Recipe {collection_name} is missing tmdb_collection_id")
+                    continue
+                    
+                logger.info(f"Fetching movies for TMDb collection {tmdb_collection_id}")
+                collection_movies = tmdb.get_collection_movies(tmdb_collection_id, item_limit)
+                tmdb_ids = [movie['id'] for movie in collection_movies]
+            
+            elif source_type == 'tmdb_discover' or source_type == 'tmdb_discover_individual_movies':
+                if not tmdb_discover_params:
+                    logger.warning(f"Recipe {collection_name} is missing tmdb_discover_params")
+                    continue
+                    
+                logger.info(f"Discovering movies using: {tmdb_discover_params}")
+                discovered_movies = tmdb.discover_movies(tmdb_discover_params, item_limit)
+                tmdb_ids = [movie['id'] for movie in discovered_movies]
+            
+            else:
+                logger.warning(f"Unsupported source_type '{source_type}' for {collection_name}")
+                continue
+                
+            logger.info(f"Found {len(tmdb_ids)} movies for collection \"{collection_name}\"")
+            
+            # Prepare artwork URLs
+            poster_url = None
+            backdrop_url = None
+            
             try:
-                collection_id = _sync_collection(jellyfin, recipe['name'], tmdb_ids)
+                collection_id = _sync_collection(emby, collection_name, tmdb_ids)
                 if collection_id and (poster_url or backdrop_url):
-                    logger.info(f"Updating artwork for Jellyfin collection '{recipe['name']}'")
-                    if jellyfin.update_collection_artwork(collection_id, poster_url, backdrop_url):
-                        logger.info(f"Successfully updated artwork for Jellyfin collection '{recipe['name']}'")
+                    logger.info(f"Updating artwork for Emby collection '{collection_name}'")
+                    if emby.update_collection_artwork(collection_id, poster_url, backdrop_url):
+                        logger.info(f"Successfully updated artwork for Emby collection '{collection_name}'")
                     else:
-                        logger.warning(f"Failed to update artwork for Jellyfin collection '{recipe['name']}'")
+                        logger.warning(f"Failed to update artwork for Emby collection '{collection_name}'")
             except Exception as e:
-                logger.error(f"Error syncing '{recipe['name']}' to Jellyfin: {e}")
+                logger.error(f"Error syncing '{collection_name}' to Emby: {e}")
 
 def _sync_collection(server_client, collection_name, tmdb_ids):
     """
