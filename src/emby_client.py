@@ -274,6 +274,57 @@ class EmbyClient(MediaServerClient):
         
         return result
 
+    def debug_check_sort_names(self, collection_id: str, limit: int = 5) -> None:
+        """
+        Debug utility to check what SortName values are actually stored in Emby for items in a collection.
+        Args:
+            collection_id: The Emby collection ID to check items for
+            limit: Maximum number of items to check (default 5)
+        """
+        logger.info(f"==== DEBUG: Checking actual SortName values for collection {collection_id} =====")
+        
+        # First get the collection items
+        collection_items_url = f"/Users/{self.user_id}/Items?ParentId={collection_id}&Limit={limit}"
+        items_data = self._make_api_request('GET', collection_items_url)
+        
+        if not items_data or 'Items' not in items_data or not items_data['Items']:
+            logger.info(f"No items found in collection {collection_id}")
+            return
+        
+        for item in items_data['Items']:
+            item_id = item.get('Id')
+            item_name = item.get('Name', 'Unknown')
+            
+            # Check direct item data
+            logger.info(f"Item: {item_name} (ID: {item_id})")
+            logger.info(f"  - SortName in collection response: {item.get('SortName', 'NOT SET')}")
+            
+            # Get full item details
+            item_details = self._make_api_request('GET', f"/Users/{self.user_id}/Items/{item_id}")
+            if item_details:
+                logger.info(f"  - SortName in full item data: {item_details.get('SortName', 'NOT SET')}")
+                logger.info(f"  - ForcedSortName in item data: {item_details.get('ForcedSortName', 'NOT SET')}")
+                logger.info(f"  - LockedFields: {item_details.get('LockedFields', [])}")
+            
+            # Check display preferences
+            pref_url = f"{self.server_url}/DisplayPreferences/items/{item_id}?api_key={self.api_key}&userId={self.user_id}"
+            pref_resp = self.session.get(pref_url, timeout=15)
+            
+            if pref_resp.status_code == 200:
+                try:
+                    pref_data = pref_resp.json()
+                    custom_prefs = pref_data.get('CustomPrefs', {})
+                    logger.info(f"  - Display preferences SortName: {custom_prefs.get('SortName', 'NOT SET')}")
+                    logger.info(f"  - Display preferences ForcedSortName: {custom_prefs.get('ForcedSortName', 'NOT SET')}")
+                except Exception as e:
+                    logger.info(f"  - Error parsing display preferences: {e}")
+            else:
+                logger.info(f"  - No display preferences found (status: {pref_resp.status_code})")
+                
+            logger.info("-----------------------------------")
+        
+        logger.info(f"==== END DEBUG: Checked {min(limit, len(items_data['Items']))} items =====")
+    
     def update_collection_items(self, collection_id: str, item_ids: List[str]) -> bool:
         """
         Set the items for a given Emby collection, applying custom sort order.
