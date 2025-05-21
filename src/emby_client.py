@@ -417,31 +417,28 @@ class EmbyClient(MediaServerClient):
             target_sort_name = f"{prefix}{item_name_for_log}"
             
             try:
-                # COMPLETELY NEW APPROACH: Use item metadata directly - no user-specific path
-                # Based on testing, we need to get the raw item first
-                core_item_data_url = f"/Items/{item_id}"
-                core_item_data = self._make_api_request('GET', core_item_data_url)
+                # REVISED APPROACH: Get item data with user context path
+                # Based on error logs, /Items/{id} doesn't work, but user-specific path does
+                item_data_url = f"/Users/{self.user_id}/Items/{item_id}"
+                item_data = self._make_api_request('GET', item_data_url)
                 
-                if not core_item_data:
-                    logger.error(f"Failed to GET core item data for {item_name_for_log} (ID: {item_id})")
+                if not item_data:
+                    logger.error(f"Failed to GET item data for {item_name_for_log} (ID: {item_id})")
                     all_successful = False
                     continue
                     
-                # Create a direct payload focused only on SortName and key required fields
-                update_payload = {
-                    "Id": item_id,
-                    "Name": core_item_data.get('Name', item_name_for_log),
-                    "SortName": target_sort_name,
-                    "ForcedSortName": target_sort_name,
-                    "ProviderIds": core_item_data.get('ProviderIds', {}),
-                    "LockedFields": [],  # Explicitly unlock all fields
-                    "LockData": False     # Ensure data isn't locked
-                }
+                # Create a full payload starting with the existing item data
+                # This ensures we don't miss any required fields
+                update_payload = item_data.copy()
                 
-                # Carry forward key metadata fields to avoid API errors
-                for field in ['Path', 'Type', 'MediaType', 'PlayableMediaType', 'MediaSources', 'SourceType']:
-                    if field in core_item_data:
-                        update_payload[field] = core_item_data[field]
+                # Set the SortName properties
+                update_payload["SortName"] = target_sort_name
+                update_payload["ForcedSortName"] = target_sort_name
+                
+                # Make sure data isn't locked
+                update_payload["LockedFields"] = [] # Explicitly unlock all fields
+                if "LockData" in update_payload:
+                    update_payload["LockData"] = False
                         
                 # POST directly to the /Items/ endpoint (no user path)
                 direct_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
@@ -454,7 +451,7 @@ class EmbyClient(MediaServerClient):
                     continue
                     
                 # VERIFY update actually worked by getting the item again
-                verify_data = self._make_api_request('GET', f"/Items/{item_id}")
+                verify_data = self._make_api_request('GET', f"/Users/{self.user_id}/Items/{item_id}")
                 actual_sort_name = verify_data.get('SortName') if verify_data else None
                 if actual_sort_name != target_sort_name:
                     logger.error(f"SortName verification failed for {item_name_for_log}! Expected '{target_sort_name}', got '{actual_sort_name}'")
