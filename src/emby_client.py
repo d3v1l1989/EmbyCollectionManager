@@ -295,14 +295,19 @@ class EmbyClient(MediaServerClient):
             return True # Pretend success
         
         # 1. Add/Update items in the collection
+        # First, ensure we have no duplicate IDs which could cause issues
+        unique_item_ids = list(dict.fromkeys(item_ids))  # Preserve order while removing duplicates
+        
+        if len(unique_item_ids) < len(item_ids):
+            logger.info(f"Removed {len(item_ids) - len(unique_item_ids)} duplicate item IDs from collection update")
+        
         # Emby's /Collections/{Id}/Items endpoint replaces all items with the provided list.
         # So, we just pass the full desired list.
-        
-        items_to_set_str = ",".join(item_ids) if item_ids else "" # Handle empty list to clear collection
+        items_to_set_str = ",".join(unique_item_ids) if unique_item_ids else "" # Handle empty list to clear collection
         add_items_url = f"{self.server_url}/Collections/{collection_id}/Items?api_key={self.api_key}&Ids={items_to_set_str}"
         
         try:
-            logger.info(f"Setting {len(item_ids)} items for collection {collection_id}...")
+            logger.info(f"Setting {len(unique_item_ids)} items for collection {collection_id}...")
             # This POST request replaces the collection's content with the given IDs
             response = self.session.post(add_items_url, timeout=30) 
             
@@ -425,7 +430,8 @@ class EmbyClient(MediaServerClient):
                 payload = {
                     "Type": "Primary",  # Primary = poster in Emby
                     "ImageUrl": poster_url,
-                    "ProviderName": "TMDb" # Or any other provider name, it's informational
+                    "ProviderName": "TMDb", # Or any other provider name, it's informational
+                    "EnableImageEnhancers": "false"  # Prevent Emby from trying to enhance/modify the image
                 }
                 logger.info(f"Updating poster for collection {collection_id}")
                 
@@ -449,7 +455,8 @@ class EmbyClient(MediaServerClient):
                 payload = {
                     "Type": "Backdrop",  # Backdrop/fanart
                     "ImageUrl": backdrop_url,
-                    "ProviderName": "TMDb"
+                    "ProviderName": "TMDb",
+                    "EnableImageEnhancers": "false"  # Prevent Emby from trying to enhance/modify the image
                 }
                 logger.info(f"Updating backdrop for collection {collection_id}")
                 
