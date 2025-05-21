@@ -348,6 +348,7 @@ class EmbyClient(MediaServerClient):
                     collection_metadata_payload['LockedFields'] = locked_fields
                     
                     # Send the update to the collection
+                    logger.debug(f"Collection metadata update payload for {collection_id}: {collection_metadata_payload}")
                     collection_item_update_url = f"{self.server_url}/Items/{collection_id}?api_key={self.api_key}"
                     update_response = self.session.post(collection_item_update_url, json=collection_metadata_payload, timeout=30)
                     display_order_update_attempted = True
