@@ -126,10 +126,10 @@ class JellyfinClient(MediaServerClient):
         Returns:
             List of Jellyfin item IDs (str).
         """
-        item_ids = []
-        all_found_ids = set()  # Track all found item IDs across all methods
-        total_to_find = len(tmdb_ids)
-        print(f"Searching for {total_to_find} movies in Jellyfin library by TMDb IDs")
+        found_jellyfin_ids = []
+        all_found_ids_set = set()  # Track all found item IDs across all methods to avoid duplicates in the final list
+        total_tmdb_ids_to_find = len(tmdb_ids)
+        print(f"Searching for {total_tmdb_ids_to_find} movies in Jellyfin library by TMDb IDs")
         
         # Define batch size to prevent too long URLs
         batch_size = 50
@@ -149,7 +149,7 @@ class JellyfinClient(MediaServerClient):
                     'IncludeItemTypes': 'Movie',
                     'Fields': 'ProviderIds,Path',
                     'AnyProviderIdEquals': provider_ids_str,
-                    'Limit': total_to_find,  # Allow more results per batch query
+                    'Limit': total_tmdb_ids_to_find,  # Allow more results per batch query
                     '_cb': uuid.uuid4().hex  # Cache buster
                 }
                 
@@ -164,19 +164,18 @@ class JellyfinClient(MediaServerClient):
                     for item in data['Items']:
                         name = item.get('Name', '(unknown)')
                         item_id = item['Id']
-                        # print(f"  - Found match: {name} (ID: {item_id})") # Commented out for cleaner logs
-                        if item_id not in all_found_ids:  # Avoid duplicates across batches
-                            all_found_ids.add(item_id)
-                            item_ids.append(item_id)
+                        if item_id not in all_found_ids_set:  # Avoid duplicates across batches
+                            all_found_ids_set.add(item_id)
+                            found_jellyfin_ids.append(item_id)
             
             # After all batches, report how many items we found
-            print(f"Found {len(item_ids)} movies out of {total_to_find} requested TMDb IDs")
+            print(f"Batch search: Found {len(found_jellyfin_ids)} Jellyfin items for {total_tmdb_ids_to_find} requested TMDb IDs")
         except Exception as e:
             print(f"Error searching by batched provider IDs: {e}")
                 
         # If we didn't find many matches, try the direct approach using all movies
-        if len(item_ids) < total_to_find / 10:  # If we found less than 10% of movies
-            print(f"Only found {len(item_ids)} movies with batch method, trying full library scan...")
+        if len(found_jellyfin_ids) < total_tmdb_ids_to_find / 10:  # If we found less than 10% of movies
+            print(f"Fallback 1: Found only {len(found_jellyfin_ids)} Jellyfin items (less than 10% of {total_tmdb_ids_to_find}). Trying full library scan for the original {total_tmdb_ids_to_find} TMDb IDs...")
             try:
                 # Get all movies and manually check TMDb IDs
                 params = {
@@ -205,40 +204,15 @@ class JellyfinClient(MediaServerClient):
                                     name = item.get('Name', '(unknown)')
                                     item_id = item['Id']
                                     print(f"Found match via scan: {name} (ID: {item_id})")
-                                    if item_id not in all_found_ids:  # Avoid duplicates
-                                        all_found_ids.add(item_id)
-                                        item_ids.append(item_id)
-                                    break
+                                    if item_id not in all_found_ids_set:  # Avoid duplicates
+                                        all_found_ids_set.add(item_id)
+                                        found_jellyfin_ids.append(item_id)
+                                        break
             except Exception as e:
                 print(f"Error scanning full library: {e}")
-        
-        # If we still have very few movies, add some recent popular ones as a fallback
-        if len(item_ids) < 5:
-            print("Found very few matches. Adding some recent popular movies as fallback...")
-            try:
-                params = {
-                    'Recursive': 'true',
-                    'IncludeItemTypes': 'Movie',
-                    'SortBy': 'DateCreated,SortName',  # Recently added
-                    'SortOrder': 'Descending',
-                    'Limit': 20
-                }
-                endpoint = f"/Users/{self.user_id}/Items"
-                data = self._make_api_request('GET', endpoint, params=params)
-                if data and 'Items' in data:
-                    for item in data['Items']:
-                        if item['Id'] not in all_found_ids:  # Avoid duplicates
-                            all_found_ids.add(item['Id'])
-                            item_ids.append(item['Id'])
-                            print(f"Added fallback movie: {item.get('Name', '(unknown)')} (ID: {item['Id']})")
-                            # Stop after we've added enough fallbacks
-                            if len(item_ids) >= 20:
-                                break
-            except Exception as e:
-                print(f"Error adding fallback movies: {e}")
-        
-        print(f"Found {len(item_ids)} movies out of {total_to_find} requested TMDb IDs")
-        return item_ids
+    
+        # Final list of Jellyfin IDs to be returned
+        return found_jellyfin_ids
         
     def update_collection_items(self, collection_id: str, item_ids: List[str]) -> bool:
         """
