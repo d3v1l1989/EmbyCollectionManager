@@ -136,12 +136,15 @@ def main():
     
     args = parser.parse_args()
     
-    # Load .env file if dotenv is available
+    # Load .env file if the dotenv package is available
     if has_dotenv:
-        load_dotenv()
-    elif not args.server_url or not args.api_key or not args.user_id:
+        try:
+            load_dotenv()
+        except Exception as e:
+            logger.warning(f"Error loading .env file: {e}")
+    elif not (args.server_url and args.api_key and args.user_id):
         logger.warning("python-dotenv package not installed. Using command line or environment variables only.")
-        logger.warning("Install with: pip install python-dotenv")
+        logger.warning("Install with: pip install python-dotenv if you want to use .env files")
     
     # Get credentials from environment or command line
     server_url = args.server_url or os.getenv("EMBY_SERVER_URL")
