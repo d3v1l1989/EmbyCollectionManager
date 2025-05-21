@@ -111,9 +111,12 @@ def main():
                 if not tmdb_collection_id:
                     logger.warning(f"Recipe {collection_name} is missing tmdb_collection_id")
                     continue
-                    
-                logger.info(f"Fetching movies for TMDb collection {tmdb_collection_id}")
-                collection_movies = tmdb.get_collection_movies(tmdb_collection_id, item_limit)
+                
+                # For franchise/series collections, sort by release date by default,
+                # but allow recipe to override with specific sort order
+                sort_by = recipe.get('sort_by', 'release_date')
+                logger.info(f"Fetching movies for TMDb collection {tmdb_collection_id} (sorting by {sort_by})")
+                collection_movies = tmdb.get_collection_movies(tmdb_collection_id, item_limit, sort_by)
                 tmdb_ids = [movie['id'] for movie in collection_movies]
             
             elif source_type == 'tmdb_discover' or source_type == 'tmdb_discover_individual_movies':

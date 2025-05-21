@@ -112,13 +112,14 @@ class TmdbClient:
             return None
         return f"{self.IMAGE_BASE_URL}/{size}{path}"
 
-    def get_collection_movies(self, collection_id, limit=None):
+    def get_collection_movies(self, collection_id, limit=None, sort_by='release_date'):
         """
-        Fetch the list of movies in a TMDb collection.
+        Fetch the list of movies in a TMDb collection with sorting options.
         
         Args:
             collection_id: TMDb collection ID
             limit: Maximum number of movies to return (None for all)
+            sort_by: How to sort the movies ('release_date', 'title', or 'popularity')
             
         Returns:
             List of movie dicts from the collection
@@ -128,12 +129,29 @@ class TmdbClient:
             self.logger.error(f"Failed to get movies for collection {collection_id}")
             return []
             
-        # Return all movies or limit to the specified number
+        # Get all movies from the collection
         movies = collection_data.get('parts', [])
+        
+        # Sort the movies based on the requested sort method
+        if sort_by == 'release_date':
+            # Sort by release date (chronological order)
+            # Handle cases where release_date might be missing
+            movies.sort(key=lambda x: x.get('release_date', '0000-00-00'))
+        elif sort_by == 'title':
+            # Sort by title
+            movies.sort(key=lambda x: x.get('title', '').lower())
+        elif sort_by == 'popularity':
+            # Sort by popularity (descending)
+            movies.sort(key=lambda x: x.get('popularity', 0), reverse=True)
+        # If 'order' or 'episode_number' exists in data for ordered collections, use that
+        if all('order' in movie for movie in movies):
+            movies.sort(key=lambda x: x.get('order', 0))
+        
+        # Limit the number of movies if requested
         if limit and len(movies) > limit:
             movies = movies[:limit]
             
-        self.logger.info(f"Found {len(movies)} movies in collection {collection_id}")
+        self.logger.info(f"Found {len(movies)} movies in collection {collection_id}, sorted by {sort_by}")
         return movies
 
     def get_artwork_for_collection(self, collection_data):

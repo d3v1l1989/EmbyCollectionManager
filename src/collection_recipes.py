@@ -23,24 +23,41 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
         "target_servers": ["emby"]
     },
 
-    # Example series/franchise collections (real TMDb collection IDs should be looked up)
+    # Series/franchise collections with explicit sorting options
     {
         "name": "Star Wars Collection",
         "source_type": "tmdb_series_collection",
         "tmdb_collection_id": 10,
-        "target_servers": ["emby"]
+        "target_servers": ["emby"],
+        "sort_by": "title"  # Sort by episode order which is reflected in titles (Episode I, II, etc.)
     },
     {
         "name": "James Bond Collection",
         "source_type": "tmdb_series_collection",
         "tmdb_collection_id": 645,
-        "target_servers": ["emby"]
+        "target_servers": ["emby"],
+        "sort_by": "release_date"  # Bond films are best viewed in release order
     },
     {
         "name": "Harry Potter Collection",
         "source_type": "tmdb_series_collection",
         "tmdb_collection_id": 1241,
-        "target_servers": ["emby"]
+        "target_servers": ["emby"],
+        "sort_by": "release_date"  # Harry Potter should follow release order
+    },
+    {
+        "name": "Marvel Cinematic Universe Collection",
+        "source_type": "tmdb_series_collection",
+        "tmdb_collection_id": 86311,
+        "target_servers": ["emby"],
+        "sort_by": "release_date"  # MCU films are best viewed in release order
+    },
+    {
+        "name": "Fast & Furious Collection",
+        "source_type": "tmdb_series_collection",
+        "tmdb_collection_id": 9485,
+        "target_servers": ["emby"],
+        "sort_by": "release_date"  # Fast & Furious in release order
     },
     # === AUTO-GENERATED GENRE RECIPES ===
     {'item_limit': 30, 'name': 'Adventure Movies', 'source_type': 'tmdb_discover_individual_movies', 'target_servers': ['emby'], 'tmdb_discover_params': {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '12'}},
