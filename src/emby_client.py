@@ -307,7 +307,31 @@ class EmbyClient(MediaServerClient):
         
         # Try to add the items to the collection and preserve our sort order
         try:
-            # First update the collection items
+            # First we need to assign SortName values to each item to enforce our order
+            # This is CRITICAL for preserving the order in Emby
+            for index, item_id in enumerate(deduplicated_ids):
+                try:
+                    # Assign sequential SortName values (001, 002, etc.) to each item
+                    # The padding ensures proper lexicographic sorting
+                    sort_prefix = str(index + 1).zfill(3)  # 1 -> 001, 2 -> 002, etc.
+                    
+                    # Update the item with the new SortName
+                    item_update_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
+                    item_update_data = {
+                        "Id": item_id,
+                        "SortName": f"{sort_prefix}",  # Use padded index as SortName
+                        "ForcedSortName": f"{sort_prefix}"  # Force this sort name
+                    }
+                    
+                    print(f"  Setting SortName for item {item_id} to '{sort_prefix}'")
+                    item_update_response = self.session.post(item_update_url, json=item_update_data, timeout=15)
+                    
+                    if item_update_response.status_code not in [200, 204]:
+                        print(f"  Warning: Failed to set SortName for item {item_id}: {item_update_response.status_code}")
+                except Exception as e:
+                    print(f"  Error setting SortName for item {item_id}: {e}")
+            
+            # Now update the collection items
             endpoint = f"/Collections/{collection_id}/Items"            
             params = {"Ids": ",".join(deduplicated_ids)}
             print(f"Adding {len(deduplicated_ids)} items to collection {collection_id}...")
@@ -336,16 +360,17 @@ class EmbyClient(MediaServerClient):
                 collection_update_endpoint = f"/Items/{collection_id}"
                 collection_update_url = f"{self.server_url}{collection_update_endpoint}?api_key={self.api_key}"
                 
-                # Set SortName to "" to force manual sorting mode, which preserves the order of the items we added
+                # For collections, Emby honors 'SortName' DisplayOrder with numbered prefixes for items
+                # When 'DisplayOrder' is set to 'SortName', Emby will sort items by their SortName values
                 update_data = {
                     "Id": collection_id,
-                    "SortName": "",  # Empty sort name enables manual sorting
-                    "ForcedSortName": "",
+                    "SortName": collection_id,  # Keep the original ID as SortName
+                    "ForcedSortName": collection_id,
                     "IsFolder": True,
                     "Type": "BoxSet",
                     "PreferredMetadataLanguage": "en",
                     "PreferredMetadataCountryCode": "US",
-                    "DisplayOrder": "Manual"  # This is the key setting to preserve our order
+                    "DisplayOrder": "SortName"  # SortName is better supported than Manual across Emby versions
                 }
                 
                 print(f"Setting collection to use manual sort order to preserve our ordering...")
