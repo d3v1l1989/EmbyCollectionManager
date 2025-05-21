@@ -310,16 +310,37 @@ class EmbyClient(MediaServerClient):
 
                 # 2. Set and VERIFY the Collection's DisplayOrder to "SortName"
                 logger.info(f"Attempting to set collection {collection_id} DisplayOrder to SortName...")
-                collection_item_update_url = f"{self.server_url}/Items/{collection_id}?api_key={self.api_key}"
-                collection_metadata_payload = {
-                    "Id": collection_id, # Required by this endpoint
-                    "DisplayOrder": "SortName",
-                    "LockedFields": [] # Attempt to unlock all fields for this update, or specify ["DisplayOrder"]
-                }
                 
-                update_response = self.session.post(collection_item_update_url, json=collection_metadata_payload, timeout=30)
+                # Initialize update_response to None to track if we attempted the update
+                update_response = None
+                display_order_update_attempted = False
                 
-                if update_response.status_code in [200, 204]: # 200 OK or 204 No Content
+                # First, get the current collection data to ensure we have all required fields
+                # This is necessary because the API requires a 'source' parameter and other fields
+                collection_data = self._make_api_request('GET', f"/Users/{self.user_id}/Items/{collection_id}")
+                
+                if not collection_data:
+                    logger.error(f"Failed to fetch collection data for ID: {collection_id}")
+                    # Continue anyway to try setting SortNames for items
+                else:
+                    # Start with all existing data and modify what we need
+                    collection_metadata_payload = collection_data.copy()
+                    
+                    # Set the DisplayOrder to SortName
+                    collection_metadata_payload["DisplayOrder"] = "SortName"
+                    
+                    # Ensure LockedFields allows DisplayOrder to be changed
+                    locked_fields = collection_metadata_payload.get('LockedFields') if isinstance(collection_metadata_payload.get('LockedFields'), list) else []
+                    locked_fields = [field for field in locked_fields if field != 'DisplayOrder']
+                    collection_metadata_payload['LockedFields'] = locked_fields
+                    
+                    # Send the update to the collection
+                    collection_item_update_url = f"{self.server_url}/Items/{collection_id}?api_key={self.api_key}"
+                    update_response = self.session.post(collection_item_update_url, json=collection_metadata_payload, timeout=30)
+                    display_order_update_attempted = True
+                
+                # Only perform verification if we attempted the update
+                if display_order_update_attempted and update_response and update_response.status_code in [200, 204]:
                     logger.info(f"Attempt to set collection DisplayOrder to SortName successful (HTTP {update_response.status_code}). Verifying...")
                     
                     # *** IMMEDIATE VERIFICATION ***
@@ -333,9 +354,14 @@ class EmbyClient(MediaServerClient):
                             logger.critical(f"CRITICAL: Collection DisplayOrder did NOT stick! Expected 'SortName', got '{actual_display_order}'. Sorting will likely fail.")
                     else:
                         logger.warning(f"Could not verify collection DisplayOrder. Response: {verify_data}")
-                else:
+                elif display_order_update_attempted and update_response:
                     logger.error(f"FAILED to set collection DisplayOrder to SortName. Status: {update_response.status_code} - {update_response.text[:200]}")
-                    # Even if this fails, proceed to set item sort names as they might be useful if DisplayOrder is set manually.
+                elif display_order_update_attempted:
+                    logger.error(f"FAILED to set collection DisplayOrder to SortName. No response received.")
+                else:
+                    logger.warning(f"Could not attempt to set collection DisplayOrder due to missing collection data.")
+                    
+                # Even if DisplayOrder update fails, proceed to set item sort names as they might be useful if DisplayOrder is set manually.
 
                 # 3. Set SortName for each item in the collection based on the desired order
                 logger.info(f"Setting individual item SortNames for custom order in collection {collection_id}...")
