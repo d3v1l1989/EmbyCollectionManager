@@ -327,8 +327,9 @@ class EmbyClient(MediaServerClient):
                     # Start with all existing data and modify what we need
                     collection_metadata_payload = collection_data.copy()
                     
-                    # Set the DisplayOrder to SortName
-                    collection_metadata_payload["DisplayOrder"] = "SortName"
+                    # Set the DisplayOrder to ProductionYear in descending order
+                    collection_metadata_payload["DisplayOrder"] = "ProductionYear"
+                    collection_metadata_payload["SortOrder"] = "Descending"
                     
                     # Ensure LockedFields allows DisplayOrder to be changed
                     locked_fields = collection_metadata_payload.get('LockedFields') if isinstance(collection_metadata_payload.get('LockedFields'), list) else []
@@ -345,14 +346,15 @@ class EmbyClient(MediaServerClient):
                     logger.info(f"Attempt to set collection DisplayOrder to SortName successful (HTTP {update_response.status_code}). Verifying...")
                     
                     # *** IMMEDIATE VERIFICATION ***
-                    verification_url = f"{self.server_url}/Users/{self.user_id}/Items/{collection_id}?api_key={self.api_key}&Fields=DisplayOrder,Name"
-                    verify_data = self._make_api_request('GET', f"/Users/{self.user_id}/Items/{collection_id}", params={'Fields': 'DisplayOrder,Name'})
+                    verification_url = f"{self.server_url}/Users/{self.user_id}/Items/{collection_id}?api_key={self.api_key}&Fields=DisplayOrder,SortOrder,Name"
+                    verify_data = self._make_api_request('GET', f"/Users/{self.user_id}/Items/{collection_id}", params={'Fields': 'DisplayOrder,SortOrder,Name'})
 
                     if verify_data and 'DisplayOrder' in verify_data:
                         actual_display_order = verify_data['DisplayOrder']
-                        logger.info(f"VERIFIED: Collection '{verify_data.get('Name')}' (ID: {collection_id}) actual DisplayOrder is: '{actual_display_order}'")
-                        if actual_display_order != "SortName":
-                            logger.critical(f"CRITICAL: Collection DisplayOrder did NOT stick! Expected 'SortName', got '{actual_display_order}'. Sorting will likely fail.")
+                        actual_sort_order = verify_data.get('SortOrder', 'Unknown')
+                        logger.info(f"VERIFIED: Collection '{verify_data.get('Name')}' (ID: {collection_id}) is using sorting by {actual_display_order} in {actual_sort_order} order")
+                        if actual_display_order != "ProductionYear" or actual_sort_order != "Descending":
+                            logger.critical(f"CRITICAL: Collection sort settings did NOT apply! Expected 'ProductionYear/Descending', got '{actual_display_order}/{actual_sort_order}'. Year-based sorting may not work correctly.")
                     else:
                         logger.warning(f"Could not verify collection DisplayOrder. Response: {verify_data}")
                 elif display_order_update_attempted and update_response:
@@ -362,15 +364,8 @@ class EmbyClient(MediaServerClient):
                 else:
                     logger.warning(f"Could not attempt to set collection DisplayOrder due to missing collection data.")
                     
-                # Even if DisplayOrder update fails, proceed to set item sort names as they might be useful if DisplayOrder is set manually.
-
-                # 3. Set SortName for each item in the collection based on the desired order
-                logger.info(f"Setting individual item SortNames for custom order in collection {collection_id}...")
-                sort_names_success = self._set_item_sort_names(item_ids) # Pass only item_ids
-                if sort_names_success:
-                    logger.info("Successfully set all item SortNames for the collection.")
-                else:
-                    logger.warning("Warning: One or more item SortNames could not be set for the collection.")
+                # No need to set individual item sort names as we're using year-based sorting now
+                logger.info(f"Using year-based descending order for collection {collection_id} items.")
                 
                 # Optional: Trigger a refresh on the collection
                 # try:
@@ -391,114 +386,10 @@ class EmbyClient(MediaServerClient):
             logger.error(f"Error updating collection items: {e}")
             return False
 
-    # Removed set_collection_display_order as it's better handled by updating DisplayOrder on the collection item
-    # Removed set_collection_items_sort_order as its logic is now in _set_item_sort_names
-
-    def _set_item_sort_names(self, ordered_item_ids: List[str]) -> bool:
-        """
-        Set items' sort order using IndexNumber (explicit sort index) instead of SortName.
-        Args:
-            ordered_item_ids: List of Emby item IDs in the desired final sort order.
-        Returns:
-            True if all items were successfully updated, False otherwise.
-        """
-        if not ordered_item_ids:
-            return True # Nothing to do
-
-        all_successful = True
-        # Get names for logging purposes in a batch
-        item_name_map = self.get_item_names_by_ids(ordered_item_ids)
-
-        for index, item_id in enumerate(ordered_item_ids):
-            item_name_for_log = item_name_map.get(item_id, f"Item {item_id}") # Fallback name
-            
-            # Use the position directly as the sort index
-            # In Emby, lower IndexNumber = earlier in sort order
-            sort_index = index + 1
-            
-            try:
-                # Get the existing item data
-                item_data_url = f"/Users/{self.user_id}/Items/{item_id}"
-                item_data = self._make_api_request('GET', item_data_url)
-                
-                if not item_data:
-                    logger.error(f"Failed to GET item data for {item_name_for_log} (ID: {item_id})")
-                    all_successful = False
-                    continue
-                    
-                # Create a payload that includes all required fields
-                # The source parameter is critical - must not be null
-                update_payload = {
-                    "Id": item_id,
-                    "IndexNumber": sort_index,  # This is the key field for sort order
-                    "LockedFields": [],        # Ensure fields aren't locked
-                    # Make sure required fields are always included
-                    "Name": item_data.get('Name', item_name_for_log),
-                    "SourceType": item_data.get('SourceType', 'Library'),  # Default to Library if not present
-                    "Type": item_data.get('Type', 'Movie')                   # Default to Movie if not present
-                }
-                
-                # Include other essential fields that might be required
-                for field in ['Path', 'MediaType', 'MediaSources', 'ProviderIds']:
-                    if field in item_data:
-                        update_payload[field] = item_data[field]
-                        
-                # POST the update
-                update_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
-                response = self.session.post(update_url, json=update_payload, timeout=15)
-                
-                # Check response status code
-                if response.status_code not in [200, 204]:
-                    logger.error(f"Failed to set IndexNumber for {item_name_for_log}. Status: {response.status_code} - {response.text[:100]}")
-                    all_successful = False
-                    continue
-                    
-                # VERIFY update actually worked
-                verify_data = self._make_api_request('GET', f"/Users/{self.user_id}/Items/{item_id}")
-                actual_index = verify_data.get('IndexNumber') if verify_data else None
-                if actual_index != sort_index:
-                    logger.error(f"IndexNumber verification failed for {item_name_for_log}! Expected '{sort_index}', got '{actual_index}'")
-                    all_successful = False
-                else:
-                    logger.info(f"Set sort index: {sort_index} for {item_name_for_log} (ID: {item_id})")
-                
-                # Update the ParentIndexNumber as well for completeness (used in some views)
-                try:
-                    # Use the same comprehensive approach as for IndexNumber - include all required fields
-                    parent_update = {
-                        "Id": item_id,
-                        "ParentIndexNumber": 1,  # Set all to same season/parent
-                        "LockedFields": [],      # Ensure fields aren't locked
-                        # Make sure required fields are always included
-                        "Name": item_data.get('Name', item_name_for_log),
-                        "SourceType": item_data.get('SourceType', 'Library'),  # Default to Library if not present
-                        "Type": item_data.get('Type', 'Movie'),                 # Default to Movie if not present
-                        "IndexNumber": sort_index  # Keep the sort index we just set
-                    }
-                    
-                    # Include other essential fields that might be required
-                    for field in ['Path', 'MediaType', 'MediaSources', 'ProviderIds']:
-                        if field in item_data:
-                            parent_update[field] = item_data[field]
-                            
-                    parent_response = self.session.post(update_url, json=parent_update, timeout=15)
-                    if parent_response.status_code not in [200, 204]:
-                        logger.warning(f"Failed to set ParentIndexNumber for {item_name_for_log}. Status: {parent_response.status_code} - {parent_response.text[:100]}")
-                except Exception as e:
-                    logger.warning(f"Exception setting ParentIndexNumber for {item_name_for_log}: {e}")
-                
-                # Trigger a metadata refresh to ensure changes propagate
-                refresh_url = f"{self.server_url}/Items/{item_id}/Refresh?Recursive=false&MetadataRefreshMode=FullRefresh&api_key={self.api_key}"
-                refresh_response = self.session.post(refresh_url, timeout=15)
-                
-                if refresh_response.status_code not in [200, 204]:
-                    logger.warning(f"Item refresh request failed for {item_name_for_log}: {refresh_response.status_code}")
-            
-            except Exception as e:
-                logger.error(f"Exception setting sort index for {item_name_for_log} (ID: {item_id}): {e}")
-                all_successful = False
-                
-        return all_successful
+    # Removed methods related to custom sorting since we're now using year-based sorting
+    # - set_collection_display_order is handled by updating DisplayOrder on the collection item
+    # - set_collection_items_sort_order is no longer needed
+    # - _set_item_sort_names has been removed as we're using ProductionYear sorting
         
     def update_collection_artwork(self, collection_id: str, poster_url: Optional[str]=None, backdrop_url: Optional[str]=None) -> bool:
         """
