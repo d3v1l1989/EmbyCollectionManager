@@ -297,7 +297,7 @@ class EmbyClient(MediaServerClient):
         # Emby's /Collections/{Id}/Items endpoint replaces all items with the provided list.
         # So, we just pass the full desired list.
         
-        items_to_set_str = ",".join(item_ids)
+        items_to_set_str = ",".join(item_ids) if item_ids else "" # Handle empty list to clear collection
         add_items_url = f"{self.server_url}/Collections/{collection_id}/Items?api_key={self.api_key}&Ids={items_to_set_str}"
         
         try:
@@ -308,22 +308,34 @@ class EmbyClient(MediaServerClient):
             if response.status_code == 204: # 204 No Content is success
                 logger.info(f"Successfully set items in collection {collection_id}.")
 
-                # 2. Set the Collection's DisplayOrder to "SortName"
+                # 2. Set and VERIFY the Collection's DisplayOrder to "SortName"
                 logger.info(f"Attempting to set collection {collection_id} DisplayOrder to SortName...")
                 collection_item_update_url = f"{self.server_url}/Items/{collection_id}?api_key={self.api_key}"
                 collection_metadata_payload = {
                     "Id": collection_id, # Required by this endpoint
                     "DisplayOrder": "SortName",
-                    # "LockedFields": [] # Optional: use if you suspect fields are locked. Clears all locks.
-                                       # Or specify fields to unlock: ["DisplayOrder"]
+                    "LockedFields": [] # Attempt to unlock all fields for this update, or specify ["DisplayOrder"]
                 }
                 
                 update_response = self.session.post(collection_item_update_url, json=collection_metadata_payload, timeout=30)
+                
                 if update_response.status_code in [200, 204]: # 200 OK or 204 No Content
-                    logger.info(f"Successfully set collection DisplayOrder to SortName.")
+                    logger.info(f"Attempt to set collection DisplayOrder to SortName successful (HTTP {update_response.status_code}). Verifying...")
+                    
+                    # *** IMMEDIATE VERIFICATION ***
+                    verification_url = f"{self.server_url}/Users/{self.user_id}/Items/{collection_id}?api_key={self.api_key}&Fields=DisplayOrder,Name"
+                    verify_data = self._make_api_request('GET', f"/Users/{self.user_id}/Items/{collection_id}", params={'Fields': 'DisplayOrder,Name'})
+
+                    if verify_data and 'DisplayOrder' in verify_data:
+                        actual_display_order = verify_data['DisplayOrder']
+                        logger.info(f"VERIFIED: Collection '{verify_data.get('Name')}' (ID: {collection_id}) actual DisplayOrder is: '{actual_display_order}'")
+                        if actual_display_order != "SortName":
+                            logger.critical(f"CRITICAL: Collection DisplayOrder did NOT stick! Expected 'SortName', got '{actual_display_order}'. Sorting will likely fail.")
+                    else:
+                        logger.warning(f"Could not verify collection DisplayOrder. Response: {verify_data}")
                 else:
-                    logger.warning(f"Failed to set collection DisplayOrder to SortName. Status: {update_response.status_code} - {update_response.text[:200]}")
-                    # Continue anyway, as item sort names might still be useful if set manually later
+                    logger.error(f"FAILED to set collection DisplayOrder to SortName. Status: {update_response.status_code} - {update_response.text[:200]}")
+                    # Even if this fails, proceed to set item sort names as they might be useful if DisplayOrder is set manually.
 
                 # 3. Set SortName for each item in the collection based on the desired order
                 logger.info(f"Setting individual item SortNames for custom order in collection {collection_id}...")
@@ -332,6 +344,17 @@ class EmbyClient(MediaServerClient):
                     logger.info("Successfully set all item SortNames for the collection.")
                 else:
                     logger.warning("Warning: One or more item SortNames could not be set for the collection.")
+                
+                # Optional: Trigger a refresh on the collection
+                # try:
+                #     refresh_url = f"{self.server_url}/Items/{collection_id}/Refresh?api_key={self.api_key}"
+                #     refresh_response = self.session.post(refresh_url, timeout=30)
+                #     if refresh_response.status_code in [200, 204]:
+                #         logger.info(f"Successfully sent refresh command for collection {collection_id}.")
+                #     else:
+                #         logger.warning(f"Failed to send refresh command for collection {collection_id}: {refresh_response.status_code}")
+                # except Exception as e_refresh:
+                #     logger.warning(f"Error sending refresh command: {e_refresh}")
                 
                 return True # Overall success if items were added, even if metadata tweaks had issues
             else:
@@ -357,64 +380,52 @@ class EmbyClient(MediaServerClient):
 
         all_successful = True
         # Get names for logging purposes in a batch
-        item_details = self.get_item_names_by_ids(ordered_item_ids)
+        item_name_map = self.get_item_names_by_ids(ordered_item_ids)
 
         for index, item_id in enumerate(ordered_item_ids):
-            item_name = item_details.get(item_id, f"Item {item_id}") # Fallback name
+            item_name_for_log = item_name_map.get(item_id, f"Item {item_id}") # Fallback name
             
-            # Create a sortable prefix (e.g., "001-", "002-")
-            # Using a simple prefix that Emby's sorter will understand
-            prefix = f"{index + 1:03d}_" # Using underscore as separator, can be a dash too
-            sort_name = f"{prefix}{item_name}"
+            # Create a sortable prefix (e.g., "001_", "002_")
+            prefix = f"{index + 1:03d}_" # Using underscore as separator
+            target_sort_name = f"{prefix}{item_name_for_log}"
             
-            # First, get the current item to ensure we have all required fields
-            # This is necessary because the API requires a 'source' parameter and other fields
             try:
-                # Get the full item first
-                get_url = f"{self.server_url}/Users/{self.user_id}/Items/{item_id}?api_key={self.api_key}"
-                item_data = self._make_api_request('GET', f"/Users/{self.user_id}/Items/{item_id}")
+                # 1. GET the full item data from the user-specific endpoint
+                item_data_get_url = f"/Users/{self.user_id}/Items/{item_id}"
+                current_item_data = self._make_api_request('GET', item_data_get_url)
                 
-                if not item_data:
-                    logger.error(f"Failed to get item data for {item_name} (ID: {item_id})")
+                if not current_item_data:
+                    logger.error(f"Failed to GET item data for {item_name_for_log} (ID: {item_id}) before SortName update.")
                     all_successful = False
                     continue
-                
-                # Now update just the SortName field while preserving other required fields
-                # Make sure to include the required fields like Id and other important metadata
-                update_payload = {
-                    "Id": item_id,
-                    "Name": item_data.get('Name', item_name),  # Keep the original name
-                    "SortName": sort_name,                     # Update the sort name
-                    "ForcedSortName": sort_name,               # Alternative field some Emby versions use
-                    "DisplayPreferencesId": item_data.get('DisplayPreferencesId', ''),
-                    "ServiceName": item_data.get('ServiceName', ''),
-                    "ExternalServiceId": item_data.get('ExternalServiceId', ''),
-                    "PremiereDate": item_data.get('PremiereDate', ''),
-                    "ProductionYear": item_data.get('ProductionYear', ''),
-                    "OfficialRating": item_data.get('OfficialRating', ''),
-                    "ProviderIds": item_data.get('ProviderIds', {})
-                }
-                
-                # Include source parameter - this is what was missing and causing the errors
-                if 'SourceType' in item_data:
-                    update_payload['SourceType'] = item_data['SourceType']
-                    
-                # Keep the library ID if present
-                if 'LibraryId' in item_data:
-                    update_payload['LibraryId'] = item_data['LibraryId']
 
-                # Make the update request
-                update_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
-                response = self.session.post(update_url, json=update_payload, timeout=15)
+                # 2. Prepare the payload for POST - start with the fetched data
+                update_payload = current_item_data.copy() # Start with all existing data
+
+                # 3. Update the SortName and ForcedSortName
+                update_payload['SortName'] = target_sort_name
+                update_payload['ForcedSortName'] = target_sort_name # Good to set both
+
+                # 4. Ensure LockedFields allows SortName to be changed
+                # If 'LockedFields' is not in current_item_data or is None, initialize it
+                locked_fields = update_payload.get('LockedFields') if isinstance(update_payload.get('LockedFields'), list) else []
+                # Remove SortName and ForcedSortName from locked fields if they are there
+                locked_fields = [field for field in locked_fields if field not in ['SortName', 'ForcedSortName']]
+                update_payload['LockedFields'] = locked_fields
+                
+                # 5. POST the modified full item data back
+                # The endpoint for item update is /Items/{Id}, not user-specific for the POST here.
+                item_update_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
+                response = self.session.post(item_update_url, json=update_payload, timeout=15)
                 
                 if response.status_code not in [200, 204]: # 200 OK or 204 No Content
-                    logger.error(f"Failed to set SortName for {item_name} (ID: {item_id}). Status: {response.status_code} - {response.text[:100]}")
+                    logger.error(f"Failed to set SortName for {item_name_for_log} (ID: {item_id}). Status: {response.status_code} - {response.text[:200]}")
                     all_successful = False
                 else:
-                    logger.info(f"Set SortName: {sort_name} for {item_name} (ID: {item_id})")
+                    logger.info(f"Set SortName: {target_sort_name} for {item_name_for_log} (ID: {item_id}) (HTTP {response.status_code})")
                     
             except Exception as e:
-                logger.error(f"Error setting SortName for {item_name} (ID: {item_id}): {e}")
+                logger.error(f"Exception setting SortName for {item_name_for_log} (ID: {item_id}): {e}")
                 all_successful = False
                 
         return all_successful
