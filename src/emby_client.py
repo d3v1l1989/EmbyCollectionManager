@@ -426,16 +426,20 @@ class EmbyClient(MediaServerClient):
                     all_successful = False
                     continue
                     
-                # Create a minimal payload to update just the critical fields
-                # Using a minimal payload reduces risk of conflicts
+                # Create a payload that includes all required fields
+                # The source parameter is critical - must not be null
                 update_payload = {
                     "Id": item_id,
                     "IndexNumber": sort_index,  # This is the key field for sort order
-                    "LockedFields": []         # Ensure fields aren't locked
+                    "LockedFields": [],        # Ensure fields aren't locked
+                    # Make sure required fields are always included
+                    "Name": item_data.get('Name', item_name_for_log),
+                    "SourceType": item_data.get('SourceType', 'Library'),  # Default to Library if not present
+                    "Type": item_data.get('Type', 'Movie')                   # Default to Movie if not present
                 }
                 
-                # If we need additional fields required by the API, include them
-                for field in ['Name', 'Path', 'Type', 'SourceType']:
+                # Include other essential fields that might be required
+                for field in ['Path', 'MediaType', 'MediaSources', 'ProviderIds']:
                     if field in item_data:
                         update_payload[field] = item_data[field]
                         
