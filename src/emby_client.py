@@ -29,16 +29,16 @@ class EmbyClient(MediaServerClient):
             'Fields': 'Name'
         }
         endpoint = f"/Users/{self.user_id}/Items"
-        print(f"Searching for collection: '{collection_name}'")
+        logger.info(f"Searching for collection: '{collection_name}'")
         data = self._make_api_request('GET', endpoint, params=params)
         if data and 'Items' in data:
             for item in data['Items']:
                 if item.get('Name', '').lower() == collection_name.lower():
-                    print(f"Found existing collection: {item['Name']} (ID: {item['Id']})")
+                    logger.info(f"Found existing collection: {item['Name']} (ID: {item['Id']})")
                     return item['Id']
         
         # Collection doesn't exist, create it using a sample item ID (required by Emby)
-        print(f"Collection '{collection_name}' not found. Creating new collection...")
+        logger.info(f"Collection '{collection_name}' not found. Creating new collection...")
         
         # First get a movie or TV show from the library to use as a starting point
         # IMPORTANT: Emby requires that we include at least one item when creating a collection
@@ -54,53 +54,60 @@ class EmbyClient(MediaServerClient):
             # Find a movie to use as a starting point for the collection
             if item_data and 'Items' in item_data and item_data['Items']:
                 sample_item_id = item_data['Items'][0]['Id']
-                print(f"Found sample item with ID: {sample_item_id} to use for collection creation")
+                logger.info(f"Found sample item with ID: {sample_item_id} to use for collection creation")
                 
                 # Create the collection using the sample item (this is the key insight from the other code)
                 try:
                     # Method 1: Use the direct format demonstrated in the other code
                     # Format: /Collections?api_key=XXX&IsLocked=true&Name=CollectionName&Ids=123456
                     encoded_name = quote(collection_name)
-                    full_url = f"{self.server_url}/Collections?api_key={self.api_key}&IsLocked=true&Name={encoded_name}&Ids={sample_item_id}"
-                    print(f"Creating collection with URL-encoded name and sample item...")
+                    # Ensure IsLocked=false if you want to edit it easily later, or true if you want to protect it.
+                    # Let's default to false for easier management initially.
+                    full_url = f"{self.server_url}/Collections?api_key={self.api_key}&IsLocked=false&Name={encoded_name}&Ids={sample_item_id}"
+                    logger.info(f"Creating collection with URL-encoded name and sample item...")
                     
                     # Don't print the full URL with API key
-                    print(f"URL (API key hidden): {full_url.replace(self.api_key, 'API_KEY_HIDDEN')}")
+                    logger.info(f"URL (API key hidden): {full_url.replace(self.api_key, 'API_KEY_HIDDEN')}")
                     
                     response = self.session.post(full_url, timeout=15)
                     
-                    if response.status_code == 200 and response.text:
+                    if response.status_code == 200 and response.text: # Emby usually returns 200 OK with collection details
                         try:
                             data = response.json()
                             if data and 'Id' in data:
-                                print(f"Successfully created collection '{collection_name}' with ID: {data['Id']}")
+                                new_collection_id = data['Id']
+                                logger.info(f"Successfully created collection '{collection_name}' with ID: {new_collection_id}")
                                 
                                 # Remove this temporary item from the collection immediately
                                 try:
-                                    remove_url = f"{self.server_url}/Collections/{data['Id']}/Items?api_key={self.api_key}&Ids={sample_item_id}"
-                                    print(f"Removing temporary item {sample_item_id} from collection...")
-                                    remove_response = self.session.post(remove_url, timeout=15)
-                                    
+                                    # The endpoint for removing items from a collection is /Collections/{CollectionId}/Items
+                                    # The method is DELETE, not POST, and IDs are passed in query string.
+                                    remove_url = f"{self.server_url}/Collections/{new_collection_id}/Items?api_key={self.api_key}&Ids={sample_item_id}"
+                                    logger.info(f"Removing temporary item {sample_item_id} from collection {new_collection_id}...")
+                                    # remove_response = self.session.post(remove_url, timeout=15) # Original was POST
+                                    remove_response = self.session.delete(remove_url, timeout=15) # Correct method is DELETE
+
+                                    # Successful deletion usually returns 204 No Content
                                     if remove_response.status_code == 204:
-                                        print(f"Successfully removed temporary item from collection")
+                                        logger.info(f"Successfully removed temporary item from collection")
                                     else:
-                                        print(f"Warning: Failed to remove temporary item from collection: {remove_response.status_code}")
+                                        logger.warning(f"Failed to remove temporary item from collection: {remove_response.status_code} - {remove_response.text}")
                                 except Exception as e:
-                                    print(f"Error removing temporary item from collection: {e}")
+                                    logger.error(f"Error removing temporary item from collection: {e}")
                                 
-                                return data['Id']
+                                return new_collection_id
                             else:
-                                print(f"Invalid response data when creating collection: {data}")
+                                logger.error(f"Invalid response data when creating collection: {data}")
                         except Exception as e:
-                            print(f"Error parsing collection creation response: {e}")
+                            logger.error(f"Error parsing collection creation response: {e} - Response text: {response.text}")
                     else:
-                        print(f"Collection creation failed: {response.status_code}")
+                        logger.error(f"Collection creation failed: {response.status_code}")
                         if response.text:
-                            print(f"Response: {response.text}")
+                            logger.error(f"Response: {response.text}")
                 except Exception as e:
-                    print(f"Error creating collection: {e}")
+                    logger.error(f"Error creating collection: {e}")
             else:
-                print("No sample item found to use for collection creation")
+                logger.warning("No sample item found to use for collection creation")
                 
             # If we get here, collection creation failed
             # Create a fake ID and remember the collection name for later reporting
@@ -110,11 +117,11 @@ class EmbyClient(MediaServerClient):
                 
             fake_id = str(uuid.uuid4())
             self._temp_collections[fake_id] = collection_name
-            print(f"Created temporary placeholder ID for collection '{collection_name}': {fake_id}")
-            print(f"Please create this collection manually in your Emby web interface.")
+            logger.info(f"Created temporary placeholder ID for collection '{collection_name}': {fake_id}")
+            logger.info(f"Please create this collection manually in your Emby web interface.")
             return fake_id
         except Exception as e:
-            print(f"Error during collection creation: {e}")
+            logger.error(f"Error during collection creation: {e}")
             return None
             
     def get_library_item_ids_by_tmdb_ids(self, tmdb_ids: List[int]) -> List[str]:
@@ -133,7 +140,7 @@ class EmbyClient(MediaServerClient):
         found_item_ids = []
         
         # We need to scan the entire movie library to find the matching TMDb IDs
-        print(f"Scanning library for {len(tmdb_ids)} TMDb movies...")
+        logger.info(f"Scanning library for {len(tmdb_ids)} TMDb movies...")
         
         # First get all movies from the library
         # Note this will only return the first 100-200 movies, so we need to page through results
@@ -158,7 +165,7 @@ class EmbyClient(MediaServerClient):
             # Keep fetching until we have all items or find all our TMDb IDs
             while has_more and len(found_tmdb_ids) < len(tmdb_ids_str):
                 params['StartIndex'] = start_index
-                print(f"Fetching movies batch {start_index//movie_batch_size + 1}...")
+                logger.info(f"Fetching movies batch {start_index//movie_batch_size + 1}...")
                 
                 data = self._make_api_request('GET', endpoint, params=params)
                 if not data:
@@ -193,15 +200,15 @@ class EmbyClient(MediaServerClient):
                 # Update for next batch
                 start_index += len(items)
                 has_more = start_index < total_items
-                print(f"Found {len(found_tmdb_ids)} of {len(tmdb_ids)} TMDb movies so far...")
+                logger.info(f"Found {len(found_tmdb_ids)} of {len(tmdb_ids)} TMDb movies so far...")
                 
-            print(f"Completed library scan. Found {len(found_item_ids)} of {len(tmdb_ids)} TMDb movies.")
+            logger.info(f"Completed library scan. Found {len(found_item_ids)} of {len(tmdb_ids)} TMDb movies.")
             
         except Exception as e:
-            print(f"Error scanning library for TMDb IDs: {e}")
+            logger.error(f"Error scanning library for TMDb IDs: {e}")
             
         # Return the item IDs we found
-        print(f"Found total of {len(found_item_ids)} matching movies in Emby library")
+        logger.info(f"Found total of {len(found_item_ids)} matching movies in Emby library")
         return found_item_ids
 
     def get_item_names_by_ids(self, item_ids: List[str]) -> dict:
@@ -220,318 +227,141 @@ class EmbyClient(MediaServerClient):
             return result
             
         # Process items in batches to avoid making too many individual API calls
-        batch_size = 25
+        batch_size = 25 # Emby's Ids parameter can usually take more, but 25 is safe.
         for i in range(0, len(item_ids), batch_size):
             batch = item_ids[i:i+batch_size]
             
             try:
                 # Use comma-separated list of IDs to get details for multiple items at once
                 ids_param = ",".join(batch)
-                endpoint = f"/Items?Ids={ids_param}"
-                data = self._make_api_request('GET', endpoint)
+                # Fetching from /Items requires user_id to get full editable metadata
+                endpoint = f"/Users/{self.user_id}/Items?Ids={ids_param}&Fields=Name,SortName" # Added SortName for debugging
+                data = self._make_api_request('GET', endpoint) # _make_api_request should handle self.user_id if needed by endpoint
                 
                 if data and 'Items' in data:
                     for item in data['Items']:
                         if 'Id' in item and 'Name' in item:
                             result[item['Id']] = item['Name']
             except Exception as e:
-                print(f"Error fetching names for batch of items: {e}")
+                logger.error(f"Error fetching names for batch of items: {e}")
         
         return result
 
     def update_collection_items(self, collection_id: str, item_ids: List[str]) -> bool:
         """
-        Set the items for a given Emby collection.
+        Set the items for a given Emby collection, applying custom sort order.
+        The item_ids list should be in the desired final sort order.
         Args:
             collection_id: The Emby collection ID.
-            item_ids: List of Emby item IDs to include in the collection.
+            item_ids: List of Emby item IDs to include in the collection, in the desired sort order.
         Returns:
             True if successful, False otherwise.
         """
-        if not collection_id or not item_ids:
-            print("Error: Invalid collection_id or empty item_ids list")
+        if not collection_id: # item_ids can be empty if we want to clear a collection
+            logger.error("Error: Invalid collection_id")
             return False
         
-        # Check if this is a pseudo-ID for a collection we couldn't create
         if hasattr(self, '_temp_collections') and collection_id in self._temp_collections:
             collection_name = self._temp_collections[collection_id]
-            print(f"Cannot update items for pseudo-collection '{collection_name}'")
-            print(f"To add items, create the collection manually in your Emby web interface.")
-            # We'll pretend it succeeded since we can't do anything about it
-            return True
+            logger.info(f"Cannot update items for pseudo-collection '{collection_name}'")
+            return True # Pretend success
         
-        # First get current collection items to avoid duplicates
-        current_items = []
+        # 1. Add/Update items in the collection
+        # Emby's /Collections/{Id}/Items endpoint replaces all items with the provided list.
+        # So, we just pass the full desired list.
+        
+        items_to_set_str = ",".join(item_ids)
+        add_items_url = f"{self.server_url}/Collections/{collection_id}/Items?api_key={self.api_key}&Ids={items_to_set_str}"
+        
         try:
-            # Get current collection items
-            endpoint = f"/Collections/{collection_id}/Items"
-            get_url = f"{self.server_url}{endpoint}?api_key={self.api_key}"
-            response = self.session.get(get_url, timeout=30)
+            logger.info(f"Setting {len(item_ids)} items for collection {collection_id}...")
+            # This POST request replaces the collection's content with the given IDs
+            response = self.session.post(add_items_url, timeout=30) 
             
-            if response.status_code == 200:
-                data = response.json()
-                if 'Items' in data:
-                    current_items = [item['Id'] for item in data['Items']]
-                    print(f"Collection currently has {len(current_items)} items")
-        except Exception as e:
-            print(f"Warning: Could not get current collection items: {e}")
-        
-        # Create a set for existing IDs to avoid duplicating them
-        existing_ids = set(current_items)
-        new_ids = []
-        
-        # Get item details for better logging
-        items_info = self.get_item_names_by_ids(item_ids)
-        
-        # Check for duplicates and existing items
-        added_in_this_run = set()
-        for item_id in item_ids:
-            # Skip if this item is already in the collection
-            if item_id in existing_ids:
-                movie_name = items_info.get(item_id, f"Unknown (ID: {item_id})")
-                print(f"  Skipping existing item: {movie_name}")
-                continue
+            if response.status_code == 204: # 204 No Content is success
+                logger.info(f"Successfully set items in collection {collection_id}.")
+
+                # 2. Set the Collection's DisplayOrder to "SortName"
+                logger.info(f"Attempting to set collection {collection_id} DisplayOrder to SortName...")
+                collection_item_update_url = f"{self.server_url}/Items/{collection_id}?api_key={self.api_key}"
+                collection_metadata_payload = {
+                    "Id": collection_id, # Required by this endpoint
+                    "DisplayOrder": "SortName",
+                    # "LockedFields": [] # Optional: use if you suspect fields are locked. Clears all locks.
+                                       # Or specify fields to unlock: ["DisplayOrder"]
+                }
                 
-            # Skip if we've already added this item in this run
-            if item_id in added_in_this_run:
-                movie_name = items_info.get(item_id, f"Unknown (ID: {item_id})")
-                print(f"  Skipping duplicate: {movie_name}")
-                continue
-            
-            # This is a new, unique item
-            new_ids.append(item_id)
-            added_in_this_run.add(item_id)
-            movie_name = items_info.get(item_id, f"Unknown (ID: {item_id})")
-            print(f"  Adding new item: {movie_name}")
-        
-        # If no new items to add, we're done
-        if not new_ids:
-            print("No new items to add to collection")
-            return True
-            
-        # Add the new items to the collection
-        try:
-            endpoint = f"/Collections/{collection_id}/Items"            
-            params = {"Ids": ",".join(new_ids)}
-            print(f"Adding {len(new_ids)} new items to collection {collection_id}...")
-            
-            # Use direct request because we're expecting a 204 response, not JSON
-            url = f"{self.server_url}{endpoint}"
-            if "?" in url:
-                url += "&"
+                update_response = self.session.post(collection_item_update_url, json=collection_metadata_payload, timeout=30)
+                if update_response.status_code in [200, 204]: # 200 OK or 204 No Content
+                    logger.info(f"Successfully set collection DisplayOrder to SortName.")
+                else:
+                    logger.warning(f"Failed to set collection DisplayOrder to SortName. Status: {update_response.status_code} - {update_response.text[:200]}")
+                    # Continue anyway, as item sort names might still be useful if set manually later
+
+                # 3. Set SortName for each item in the collection based on the desired order
+                logger.info(f"Setting individual item SortNames for custom order in collection {collection_id}...")
+                sort_names_success = self._set_item_sort_names(item_ids) # Pass only item_ids
+                if sort_names_success:
+                    logger.info("Successfully set all item SortNames for the collection.")
+                else:
+                    logger.warning("Warning: One or more item SortNames could not be set for the collection.")
+                
+                return True # Overall success if items were added, even if metadata tweaks had issues
             else:
-                url += "?"
-            url += f"api_key={self.api_key}"
-            
-            # Add parameters
-            for key, value in params.items():
-                url += f"&{key}={value}"
-            
-            # Send the request to add items
-            response = self.session.post(url, timeout=30)
-            
-            if response.status_code == 204:
-                print(f"Successfully added {len(new_ids)} new items to collection")
-                
-                # Now try to set the display order for boxsets
-                try:
-                    # Get the collection metadata
-                    collection_url = f"{self.server_url}/Items/{collection_id}?api_key={self.api_key}"
-                    collection_response = self.session.get(collection_url, timeout=30)
-                    
-                    if collection_response.status_code == 200:
-                        collection_data = collection_response.json()
-                        
-                        # Update the collection to use sorting by SortName instead of year
-                        update_data = {
-                            "Id": collection_id,
-                            "CollectionSortOrder": "SortName"
-                        }
-                        
-                        update_url = f"{self.server_url}/Items/{collection_id}?api_key={self.api_key}"
-                        update_response = self.session.post(update_url, json=update_data, timeout=30)
-                        
-                        if update_response.status_code in [200, 204]:
-                            print("Successfully updated collection sort order")
-                            
-                            # Now set the SortName for each item based on its position
-                            # This is crucial for making the custom sort order work
-                            self._set_item_sort_names(collection_id, item_ids)
-                        else:
-                            print(f"Note: Could not update collection sort order: {update_response.status_code}")
-                except Exception as e:
-                    print(f"Note: Error during collection sort preference update: {e}")
-                
-                print(f"\nIMPORTANT: If items are still sorted incorrectly, please use the Emby web UI:")
-                print(f"  1. Navigate to the collection and click the '...' menu")
-                print(f"  2. Select 'Edit metadata'")
-                print(f"  3. Change 'Display order' to your preferred option:")
-                print(f"     - For franchise collections, use 'Release date'")
-                print(f"     - For popular collections, use 'Popularity'")
-                
-                return True
-            else:
-                print(f"Failed to add items to collection: {response.status_code}")
-                if response.text:
-                    print(f"Response: {response.text[:200]}")
+                logger.error(f"Failed to set items in collection: {response.status_code} - {response.text[:200]}")
                 return False
         except Exception as e:
-            print(f"Error updating collection items: {e}")
+            logger.error(f"Error updating collection items: {e}")
             return False
 
-    def set_collection_display_order(self, collection_id: str) -> bool:
+    # Removed set_collection_display_order as it's better handled by updating DisplayOrder on the collection item
+    # Removed set_collection_items_sort_order as its logic is now in _set_item_sort_names
+
+    def _set_item_sort_names(self, ordered_item_ids: List[str]) -> bool:
         """
-        Set the display order property of a collection to 'SortName'
-        so that items will be sorted according to their SortName values.
-        
+        Set the SortName property for each item in the provided list based on its position.
         Args:
-            collection_id: The Emby collection ID
-        
+            ordered_item_ids: List of Emby item IDs in the desired final sort order.
         Returns:
-            True if successful, False otherwise
+            True if all items were successfully updated, False otherwise.
         """
-        try:
-            # Emby API endpoint to update item properties
-            url = f"{self.server_url}/Items/{collection_id}/DisplayPreferences?api_key={self.api_key}&userId={self.user_id}"
+        if not ordered_item_ids:
+            return True # Nothing to do
+
+        all_successful = True
+        # Get names for logging purposes in a batch
+        item_details = self.get_item_names_by_ids(ordered_item_ids)
+
+        for index, item_id in enumerate(ordered_item_ids):
+            item_name = item_details.get(item_id, f"Item {item_id}") # Fallback name
             
-            # First get current display preferences
-            response = self.session.get(url, timeout=15)
-            if response.status_code != 200:
-                print(f"Failed to get display preferences: {response.status_code}")
-                return False
-                
-            prefs = response.json()
+            # Create a sortable prefix (e.g., "001-", "002-")
+            # Using a simple prefix that Emby's sorter will understand
+            prefix = f"{index + 1:03d}_" # Using underscore as separator, can be a dash too
             
-            # Update the DisplayOrder setting
-            prefs["SortBy"] = "SortName"
-            prefs["RememberSorting"] = True
+            # Payload to update the item's SortName
+            # The /Items/{Id} endpoint for POST is used to update an item.
+            # The payload should contain the fields to be updated.
+            item_update_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
+            payload = {
+                "Id": item_id, # Usually required in the payload for this endpoint
+                "SortName": f"{prefix}{item_name}",
+                # "LockedFields": [] # Optional: to ensure SortName can be updated if locked
+                                       # Or specify fields to unlock: ["DisplayOrder"]
+            }
             
-            # Save updated preferences
-            response = self.session.post(url, json=prefs, timeout=15)
-            
-            if response.status_code in [200, 204]:
-                print(f"Successfully set collection display order to SortName")
-                return True
-            else:
-                print(f"Failed to set collection display order: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            print(f"Error setting collection display order: {e}")
-            return False
-    
-    def set_collection_items_sort_order(self, collection_id: str, item_ids: List[str]) -> bool:
-        """
-        Sets the SortName property for each item in the collection to ensure they appear
-        in the order specified by the item_ids list.
-        
-        Args:
-            collection_id: The Emby collection ID
-            item_ids: List of Emby item IDs in the desired order
-        
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            # Get collection items with their current names
-            url = f"{self.server_url}/Items?api_key={self.api_key}&userId={self.user_id}&"
-            url += f"ParentId={collection_id}&Fields=Name,SortName&Recursive=true"
-            
-            response = self.session.get(url, timeout=15)
-            if response.status_code != 200:
-                print(f"Failed to get collection items: {response.status_code}")
-                return False
-                
-            collection_items = response.json()
-            if not collection_items.get('Items'):
-                print("No items found in collection")
-                return False
-                
-            # Create a mapping of item IDs to their existing data
-            item_data = {item['Id']: item for item in collection_items.get('Items', [])}
-            
-            success = True
-            # Set SortName for each item based on its position in the item_ids list
-            for index, item_id in enumerate(item_ids):
-                if item_id not in item_data:
-                    print(f"Item ID {item_id} not found in collection")
-                    continue
-                    
-                # Create a sortable prefix with leading zeros (001, 002, etc.)
-                # This ensures proper numeric sorting
-                prefix = f"{index+1:03d}-"
-                
-                # Get the item's current name to use as base
-                item_name = item_data[item_id].get('Name', '')
-                
-                # Set the sort name with the prefix
-                sort_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
-                payload = {
-                    "SortName": f"{prefix}{item_name}"
-                }
-                
-                response = self.session.post(sort_url, json=payload, timeout=15)
-                if response.status_code not in [200, 204]:
-                    print(f"Failed to set sort name for {item_name}: {response.status_code}")
-                    success = False
-                    
-            return success
-                
-        except Exception as e:
-            print(f"Error setting collection items sort order: {e}")
-            return False
-    
-    def _set_item_sort_names(self, collection_id: str, item_ids: List[str]) -> bool:
-        """
-        Set the SortName property for each item in the collection based on its position in the item_ids list.
-        This ensures items appear in the exact order specified in item_ids rather than by year or name.
-        
-        Args:
-            collection_id: The Emby collection ID
-            item_ids: List of Emby item IDs in the desired order
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            # Get name information for all items
-            item_names = self.get_item_names_by_ids(item_ids)
-            if not item_names:
-                print("Could not get item names for sorting")
-                return False
-                
-            # Set a sort name for each item based on its position
-            success = True
-            for index, item_id in enumerate(item_ids):
-                if item_id not in item_names:
-                    continue
-                    
-                # Create a sortable prefix with leading zeros (e.g., 001-, 002-)
-                # This ensures numeric sorting in the exact order we want
-                prefix = f"{index+1:03d}-"
-                
-                # Use the item's name as the base
-                item_name = item_names[item_id]
-                
-                # Construct the API request to update SortName
-                sort_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
-                payload = {
-                    "Id": item_id,
-                    "ForcedSortName": f"{prefix}{item_name}"
-                }
-                
-                response = self.session.post(sort_url, json=payload, timeout=15)
-                if response.status_code not in [200, 204]:
-                    print(f"Failed to set sort name for {item_name}: {response.status_code}")
-                    success = False
+            try:
+                response = self.session.post(item_update_url, json=payload, timeout=15)
+                if response.status_code not in [200, 204]: # 200 OK or 204 No Content
+                    logger.error(f"Failed to set SortName for {item_name} (ID: {item_id}). Status: {response.status_code} - {response.text[:100]}")
+                    all_successful = False
                 else:
-                    print(f"Set sort order: {prefix}{item_name} for item {item_id}")
-                    
-            return success
+                    logger.info(f"Set SortName: {payload['SortName']} for {item_name} (ID: {item_id})")
+            except Exception as e:
+                logger.error(f"Error setting SortName for {item_name} (ID: {item_id}): {e}")
+                all_successful = False
                 
-        except Exception as e:
-            print(f"Error setting item sort names: {e}")
-            return False
+        return all_successful
     
     def update_collection_artwork(self, collection_id: str, poster_url: Optional[str]=None, backdrop_url: Optional[str]=None) -> bool:
         """
@@ -548,8 +378,8 @@ class EmbyClient(MediaServerClient):
         # Check if this is a pseudo-ID for a collection we couldn't create
         if hasattr(self, '_temp_collections') and collection_id in self._temp_collections:
             collection_name = self._temp_collections[collection_id]
-            print(f"Cannot update artwork for pseudo-collection '{collection_name}'")
-            print(f"To use artwork, create the collection manually in your Emby web interface.")
+            logger.info(f"Cannot update artwork for pseudo-collection '{collection_name}'")
+            logger.info(f"To use artwork, create the collection manually in your Emby web interface.")
             # We'll pretend it succeeded since we can't do anything about it
             return True
             
@@ -567,9 +397,9 @@ class EmbyClient(MediaServerClient):
                 payload = {
                     "Type": "Primary",  # Primary = poster in Emby
                     "ImageUrl": poster_url,
-                    "ProviderName": "TMDb"
+                    "ProviderName": "TMDb" # Or any other provider name, it's informational
                 }
-                print(f"Updating poster for collection {collection_id}")
+                logger.info(f"Updating poster for collection {collection_id}")
                 
                 # Use direct API call instead of the helper which expects JSON back
                 response = self.session.post(url, json=payload, timeout=15)
@@ -577,11 +407,11 @@ class EmbyClient(MediaServerClient):
                 # 204 is success with no content
                 if response.status_code in [200, 204]:
                     success = True
-                    print(f"Poster update successful (status: {response.status_code})")
+                    logger.info(f"Poster update successful (status: {response.status_code})")
                 else:
-                    print(f"Failed to update poster (status: {response.status_code})")
+                    logger.error(f"Failed to update poster (status: {response.status_code}) - {response.text}")
             except Exception as e:
-                print(f"Error updating collection poster: {e}")
+                logger.error(f"Error updating collection poster: {e}")
                 
         # Update backdrop if provided
         if backdrop_url:
@@ -593,7 +423,7 @@ class EmbyClient(MediaServerClient):
                     "ImageUrl": backdrop_url,
                     "ProviderName": "TMDb"
                 }
-                print(f"Updating backdrop for collection {collection_id}")
+                logger.info(f"Updating backdrop for collection {collection_id}")
                 
                 # Use direct API call instead of the helper which expects JSON back
                 response = self.session.post(url, json=payload, timeout=15)
@@ -601,10 +431,72 @@ class EmbyClient(MediaServerClient):
                 # 204 is success with no content
                 if response.status_code in [200, 204]:
                     success = True
-                    print(f"Backdrop update successful (status: {response.status_code})")
+                    logger.info(f"Backdrop update successful (status: {response.status_code})")
                 else:
-                    print(f"Failed to update backdrop (status: {response.status_code})")
+                    logger.error(f"Failed to update backdrop (status: {response.status_code}) - {response.text}")
             except Exception as e:
-                print(f"Error updating collection backdrop: {e}")
+                logger.error(f"Error updating collection backdrop: {e}")
                 
         return success
+
+    def _make_api_request(self, method: str, endpoint: str, params: Optional[Dict[str, Any]] = None,
+                          json_data: Optional[Dict[str, Any]] = None, **kwargs) -> Optional[Dict[str, Any]]:
+        """
+        Internal helper to make API requests.
+        
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            endpoint: API endpoint (e.g., "/Users/{user_id}/Items")
+            params: Optional query parameters
+            json_data: Optional JSON payload for POST/PUT requests
+            **kwargs: Additional keyword arguments to pass to the request
+            
+        Returns:
+            JSON response data or None if error/no content
+        """
+        # Call the parent class implementation which handles common functionality
+        # This implementation adds a few Emby-specific enhancements
+        
+        # Make sure we have a session with proper headers
+        if not hasattr(self, 'session'):
+            self.session = requests.Session()
+            self.session.headers.update({
+                'X-Emby-Token': self.api_key,
+                'Accept': 'application/json'
+            })
+        
+        # Ensure API key is included in requests
+        current_params = params.copy() if params else {}
+        if 'api_key' not in current_params and not endpoint.lower().startswith('http'):
+            current_params['api_key'] = self.api_key
+            
+        try:
+            url = f"{self.server_url}{endpoint}" if not endpoint.lower().startswith('http') else endpoint
+            response = self.session.request(method, url, params=current_params, json=json_data, timeout=30, **kwargs)
+            response.raise_for_status()
+            
+            # Handle 204 No Content responses (successful but no body)
+            if response.status_code == 204:
+                return None
+                
+            return response.json()
+            
+        except requests.exceptions.JSONDecodeError as e:
+            logger.error(f"API response is not valid JSON: {e}")
+            if 'response' in locals():
+                logger.error(f"Response text: {response.text[:200]}")
+            return None
+            
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"API request failed with HTTP error: {e}")
+            logger.error(f"Request URL: {endpoint}")
+            logger.error(f"Request method: {method}")
+            logger.error(f"Request params: {params}")
+            logger.error(f"Request JSON: {json_data}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                logger.error(f"Response text: {e.response.text[:200]}")
+            return None
+            
+        except requests.RequestException as e:
+            logger.error(f"API request failed: {e}")
+            return None
