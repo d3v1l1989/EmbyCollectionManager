@@ -140,14 +140,40 @@ def main():
             
             try:
                 collection_id = _sync_collection(emby, collection_name, tmdb_ids)
-                if collection_id and (poster_url or backdrop_url):
-                    logger.info(f"Updating artwork for Emby collection '{collection_name}'")
-                    if emby.update_collection_artwork(collection_id, poster_url, backdrop_url):
-                        logger.info(f"Successfully updated artwork for Emby collection '{collection_name}'")
+
+                if collection_id: # Proceed only if collection sync was successful
+                    # --- BEGIN NEW LOGIC TO FETCH ARTWORK URLS ---
+                    if tmdb_ids: # If there are movies in the collection
+                        try:
+                            # Fetch details for the first movie to use its artwork
+                            representative_movie_id = tmdb_ids[0]
+                            logger.debug(f"Fetching details for movie ID {representative_movie_id} to get artwork for collection '{collection_name}'.")
+                            movie_details = tmdb.get_movie_details(representative_movie_id)
+                            if movie_details:
+                                if movie_details.get('poster_path'):
+                                    poster_url = tmdb.get_image_url(movie_details['poster_path'])
+                                    logger.info(f"Using poster from movie ID {representative_movie_id} for collection '{collection_name}': {poster_url}")
+                                if movie_details.get('backdrop_path'):
+                                    backdrop_url = tmdb.get_image_url(movie_details['backdrop_path'])
+                                    logger.info(f"Using backdrop from movie ID {representative_movie_id} for collection '{collection_name}': {backdrop_url}")
+                            else:
+                                logger.warning(f"Could not fetch details for movie ID {representative_movie_id} to get artwork for collection '{collection_name}'.")
+                        except Exception as e_art:
+                            logger.error(f"Error fetching artwork details for collection '{collection_name}': {e_art}")
                     else:
-                        logger.warning(f"Failed to update artwork for Emby collection '{collection_name}'")
+                        logger.info(f"No movies in collection '{collection_name}', skipping artwork update attempt.")
+                    # --- END NEW LOGIC ---
+
+                    if poster_url or backdrop_url: # Condition now checks the fetched URLs
+                        logger.info(f"Attempting to update artwork for Emby collection '{collection_name}' (ID: {collection_id})")
+                        if emby.update_collection_artwork(collection_id, poster_url, backdrop_url):
+                            logger.info(f"Successfully initiated artwork update for Emby collection '{collection_name}'")
+                        else:
+                            logger.warning(f"Call to update_collection_artwork for '{collection_name}' returned false or failed.")
+                    else:
+                        logger.info(f"No artwork URLs found or specified for collection '{collection_name}', skipping artwork update.")
             except Exception as e:
-                logger.error(f"Error syncing '{collection_name}' to Emby: {e}")
+                logger.error(f"Error processing collection '{collection_name}' for Emby: {e}")
 
 def _sync_collection(server_client, collection_name, tmdb_ids):
     """
