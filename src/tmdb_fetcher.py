@@ -9,7 +9,7 @@ class TmdbClient:
         self.api_key = api_key
         self.logger = logging.getLogger("TmdbClient")
         self.session = requests.Session()
-        self.session.params = {"api_key": self.api_key}
+        # self.session.params = {"api_key": self.api_key} # Removed: API key will be added per-request
 
     def discover_movies(self, params, page_limit=1):
         """
@@ -32,6 +32,7 @@ class TmdbClient:
                 
             req_params = dict(params)
             req_params["page"] = current_page
+            req_params["api_key"] = self.api_key # Add API key per-request
             
             try:
                 resp = self.session.get(url, params=req_params, timeout=10)
@@ -74,7 +75,8 @@ class TmdbClient:
         """
         url = f"{self.BASE_URL}/collection/{collection_id}"
         try:
-            resp = self.session.get(url, timeout=10)
+            # Add API key per-request
+            resp = self.session.get(url, params={"api_key": self.api_key}, timeout=10)
             resp.raise_for_status()
             return resp.json()
         except requests.RequestException as e:
@@ -87,7 +89,8 @@ class TmdbClient:
         """
         url = f"{self.BASE_URL}/movie/{movie_id}"
         try:
-            resp = self.session.get(url, timeout=10)
+            # Add API key per-request
+            resp = self.session.get(url, params={"api_key": self.api_key}, timeout=10)
             resp.raise_for_status()
             return resp.json()
         except requests.RequestException as e:
