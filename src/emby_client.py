@@ -365,25 +365,54 @@ class EmbyClient(MediaServerClient):
             # Create a sortable prefix (e.g., "001-", "002-")
             # Using a simple prefix that Emby's sorter will understand
             prefix = f"{index + 1:03d}_" # Using underscore as separator, can be a dash too
+            sort_name = f"{prefix}{item_name}"
             
-            # Payload to update the item's SortName
-            # The /Items/{Id} endpoint for POST is used to update an item.
-            # The payload should contain the fields to be updated.
-            item_update_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
-            payload = {
-                "Id": item_id, # Usually required in the payload for this endpoint
-                "SortName": f"{prefix}{item_name}",
-                # "LockedFields": [] # Optional: to ensure SortName can be updated if locked
-                                       # Or specify fields to unlock: ["DisplayOrder"]
-            }
-            
+            # First, get the current item to ensure we have all required fields
+            # This is necessary because the API requires a 'source' parameter and other fields
             try:
-                response = self.session.post(item_update_url, json=payload, timeout=15)
+                # Get the full item first
+                get_url = f"{self.server_url}/Users/{self.user_id}/Items/{item_id}?api_key={self.api_key}"
+                item_data = self._make_api_request('GET', f"/Users/{self.user_id}/Items/{item_id}")
+                
+                if not item_data:
+                    logger.error(f"Failed to get item data for {item_name} (ID: {item_id})")
+                    all_successful = False
+                    continue
+                
+                # Now update just the SortName field while preserving other required fields
+                # Make sure to include the required fields like Id and other important metadata
+                update_payload = {
+                    "Id": item_id,
+                    "Name": item_data.get('Name', item_name),  # Keep the original name
+                    "SortName": sort_name,                     # Update the sort name
+                    "ForcedSortName": sort_name,               # Alternative field some Emby versions use
+                    "DisplayPreferencesId": item_data.get('DisplayPreferencesId', ''),
+                    "ServiceName": item_data.get('ServiceName', ''),
+                    "ExternalServiceId": item_data.get('ExternalServiceId', ''),
+                    "PremiereDate": item_data.get('PremiereDate', ''),
+                    "ProductionYear": item_data.get('ProductionYear', ''),
+                    "OfficialRating": item_data.get('OfficialRating', ''),
+                    "ProviderIds": item_data.get('ProviderIds', {})
+                }
+                
+                # Include source parameter - this is what was missing and causing the errors
+                if 'SourceType' in item_data:
+                    update_payload['SourceType'] = item_data['SourceType']
+                    
+                # Keep the library ID if present
+                if 'LibraryId' in item_data:
+                    update_payload['LibraryId'] = item_data['LibraryId']
+
+                # Make the update request
+                update_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
+                response = self.session.post(update_url, json=update_payload, timeout=15)
+                
                 if response.status_code not in [200, 204]: # 200 OK or 204 No Content
                     logger.error(f"Failed to set SortName for {item_name} (ID: {item_id}). Status: {response.status_code} - {response.text[:100]}")
                     all_successful = False
                 else:
-                    logger.info(f"Set SortName: {payload['SortName']} for {item_name} (ID: {item_id})")
+                    logger.info(f"Set SortName: {sort_name} for {item_name} (ID: {item_id})")
+                    
             except Exception as e:
                 logger.error(f"Error setting SortName for {item_name} (ID: {item_id}): {e}")
                 all_successful = False
