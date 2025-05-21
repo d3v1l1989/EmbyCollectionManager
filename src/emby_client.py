@@ -307,29 +307,34 @@ class EmbyClient(MediaServerClient):
         
         # Try to add the items to the collection and preserve our sort order
         try:
-            # First we need to assign SortName values to each item to enforce our order
+            # First we need to assign ForcedSortName values to each item to enforce our order
             # This is CRITICAL for preserving the order in Emby
             for index, item_id in enumerate(deduplicated_ids):
                 try:
-                    # Assign sequential SortName values (001, 002, etc.) to each item
+                    # Assign sequential sort values with a special prefix (!!!)
                     # The padding ensures proper lexicographic sorting
-                    sort_prefix = str(index + 1).zfill(3)  # 1 -> 001, 2 -> 002, etc.
+                    sort_index = str(1000000 - index).zfill(7)  # Reverse order: higher index = earlier in list
                     
-                    # Update the item with the new SortName
+                    # Use a special prefix pattern (!!!) which Emby recognizes for custom sorting
+                    # The prefix, plus a large enough number that decreases with each item ensures proper sorting
+                    
+                    # Update the item with only the ForcedSortName - this is the key fix
+                    # SortName is a read-only property, but ForcedSortName can be modified
                     item_update_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
+                    
+                    # Set only the one property we can actually modify
                     item_update_data = {
                         "Id": item_id,
-                        "SortName": f"{sort_prefix}",  # Use padded index as SortName
-                        "ForcedSortName": f"{sort_prefix}"  # Force this sort name
+                        "ForcedSortName": f"!!!{sort_index}"  # !!! prefix ensures these sort before normal items
                     }
                     
-                    print(f"  Setting SortName for item {item_id} to '{sort_prefix}'")
+                    print(f"  Setting ForcedSortName for item {item_id} to '!!!{sort_index}'")
                     item_update_response = self.session.post(item_update_url, json=item_update_data, timeout=15)
                     
                     if item_update_response.status_code not in [200, 204]:
-                        print(f"  Warning: Failed to set SortName for item {item_id}: {item_update_response.status_code}")
+                        print(f"  Warning: Failed to set ForcedSortName for item {item_id}: {item_update_response.status_code}")
                 except Exception as e:
-                    print(f"  Error setting SortName for item {item_id}: {e}")
+                    print(f"  Error setting ForcedSortName for item {item_id}: {e}")
             
             # Now update the collection items
             endpoint = f"/Collections/{collection_id}/Items"            
@@ -360,20 +365,18 @@ class EmbyClient(MediaServerClient):
                 collection_update_endpoint = f"/Items/{collection_id}"
                 collection_update_url = f"{self.server_url}{collection_update_endpoint}?api_key={self.api_key}"
                 
-                # For collections, Emby honors 'SortName' DisplayOrder with numbered prefixes for items
-                # When 'DisplayOrder' is set to 'SortName', Emby will sort items by their SortName values
+                # For collections, Emby respects ForcedSortName values when DisplayOrder is set to SortName
+                # Setting DisplayOrder to SortName tells Emby to sort by the custom sort values we've assigned
                 update_data = {
                     "Id": collection_id,
-                    "SortName": collection_id,  # Keep the original ID as SortName
-                    "ForcedSortName": collection_id,
                     "IsFolder": True,
                     "Type": "BoxSet",
                     "PreferredMetadataLanguage": "en",
                     "PreferredMetadataCountryCode": "US",
-                    "DisplayOrder": "SortName"  # SortName is better supported than Manual across Emby versions
+                    "DisplayOrder": "SortName"  # This tells Emby to use our ForcedSortName values
                 }
                 
-                print(f"Setting collection to use manual sort order to preserve our ordering...")
+                print(f"Setting collection to use SortName display order to preserve our custom ordering...")
                 update_response = self.session.post(collection_update_url, json=update_data, timeout=30)
                 
                 if update_response.status_code in [200, 204]:
