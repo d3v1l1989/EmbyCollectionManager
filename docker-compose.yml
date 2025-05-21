@@ -11,5 +11,5 @@ services:
     # Sync targets are controlled via SYNC_TARGET in your .env file
     # No need to override the command or entrypoint
     # environment:
-    #   - SYNC_TARGET=auto  # Options: auto, emby, jellyfin, all
+    #   - SYNC_TARGET=auto  # Options: auto, emby
     restart: unless-stopped

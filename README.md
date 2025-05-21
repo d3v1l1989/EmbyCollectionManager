@@ -1,12 +1,11 @@
 # TMDbCollector
 
-TMDbCollector is a Python application that automatically generates and syncs movie collections in Emby and/or Jellyfin servers, using dynamic lists and franchise data fetched from The Movie Database (TMDb). Inspired by the Stremio TMDb collections addon, it keeps your media server collections fresh and relevant—no manual curation required.
+TMDbCollector is a Python application that automatically generates and syncs movie collections in your Emby server, using dynamic lists and franchise data fetched from The Movie Database (TMDb). Inspired by the Stremio TMDb collections addon, it keeps your media server collections fresh and relevant—no manual curation required.
 
 ## Features
 - **Auto-generate collections**: Popular, Top Rated, New Releases, Genres, and major Franchises (e.g., Star Wars, James Bond, Harry Potter)
 - **Beautiful collection artwork**: Automatically fetches and applies posters and backdrops from TMDb
-- **Sync to Emby and/or Jellyfin**: Works with both servers, or just one
-- **Smart server detection**: Auto-detects configured servers by default
+- **Smart server detection**: Auto-detects if Emby is configured
 - **Customizable recipes**: Easily edit or extend collection logic in `src/collection_recipes.py`
 - **Robust error handling & logging**
 - **Configurable via YAML and/or .env files**
@@ -14,7 +13,7 @@ TMDbCollector is a Python application that automatically generates and syncs mov
 ## Requirements
 - Python 3.8+ (for direct installation)
 - Docker (for containerized installation - recommended)
-- Emby or Jellyfin server (with API key and user ID)
+- Emby server (with API key and user ID)
 - TMDb API key (free from [themoviedb.org](https://www.themoviedb.org/settings/api))
 
 ## Quick Start (Docker)
@@ -45,11 +44,6 @@ emby:
   server_url: http://emby:8096
   api_key: your_emby_api_key
   user_id: your_emby_user_id
-
-jellyfin:
-  server_url: http://jellyfin:8096
-  api_key: your_jellyfin_api_key
-  user_id: your_jellyfin_user_id
 ```
 
 ### Example .env file
@@ -59,12 +53,9 @@ TMDB_API_KEY=your_tmdb_api_key
 EMBY_API_KEY=your_emby_api_key
 EMBY_URL=http://localhost:8096  # Use your actual server address
 EMBY_USER_ID=your_emby_user_id
-JELLYFIN_API_KEY=your_jellyfin_api_key
-JELLYFIN_URL=http://localhost:8096  # Use your actual server address
-JELLYFIN_USER_ID=your_jellyfin_user_id
 
-# Choose which server(s) to sync
-SYNC_TARGET=auto  # Options: auto, emby, jellyfin, all
+# Choose sync target
+SYNC_TARGET=auto  # Options: auto, emby
 ```
 
 ## Installation & Usage
@@ -85,15 +76,12 @@ services:
     volumes:
       - ./config:/app/config:ro
     environment:
-      - SYNC_TARGET=auto  # Options: auto, emby, jellyfin, all
+      - SYNC_TARGET=auto  # Options: auto, emby
       # Uncomment and fill in if not using config.yaml:
       # - TMDB_API_KEY=your_tmdb_api_key
       # - EMBY_API_KEY=your_emby_api_key
       # - EMBY_URL=http://emby:8096
       # - EMBY_USER_ID=your_emby_user_id
-      # - JELLYFIN_API_KEY=your_jellyfin_api_key
-      # - JELLYFIN_URL=http://jellyfin:8096
-      # - JELLYFIN_USER_ID=your_jellyfin_user_id
     # Alternative: use .env file instead of environment section above
     # env_file:
     #   - .env
@@ -155,16 +143,14 @@ If you prefer to run without Docker:
    python -m src.app_logic --targets auto
    ```
 
-## Controlling Which Servers to Sync
+## Controlling Sync Target
 
 Use the `SYNC_TARGET` environment variable (for Docker) or the `--targets` command-line flag (for direct Python usage):
 
-- **`auto`**: Auto-detect and use all configured servers (default)
-- **`emby`**: Sync only to Emby
-- **`jellyfin`**: Sync only to Jellyfin
-- **`all`**: Sync to both servers (both must be configured)
+- **`auto`**: Auto-detect and use Emby if configured (default)
+- **`emby`**: Sync to Emby
 
-Legacy approach (still supported): You can also use `SYNC_EMBY=1` and/or `SYNC_JELLYFIN=1` environment variables.
+Legacy approach (still supported): You can also use `SYNC_EMBY=1` environment variable.
 
 ## Advanced Usage
 
@@ -177,7 +163,7 @@ python -m src.app_logic --targets auto --config /path/to/config.yaml
 ```
 
 Arguments:
-- `--targets [auto|emby|jellyfin|all]`: Which server(s) to sync with
+- `--targets [auto|emby]`: Which server to sync with
 - `--config PATH`: Path to config YAML file (default: config/config.yaml)
 
 ### Building from Source
@@ -219,8 +205,8 @@ TMDbCollector automatically adds artwork to your collections:
    - Look at the logs: `docker logs tmdbcollector`
 
 2. **Collections don't appear in server**
-   - Ensure your Emby/Jellyfin API keys and user IDs are correct
-   - Check server URLs (make sure they're reachable from the container)
+   - Ensure your Emby API key and user ID are correct
+   - Check server URL (make sure it's reachable from the container)
    - Verify your media server has movies that match the TMDb IDs
 
 3. **No collections are synced**
@@ -231,7 +217,6 @@ TMDbCollector automatically adds artwork to your collections:
 
 - **TMDb**: Register at [themoviedb.org](https://www.themoviedb.org/settings/api) to get a free API key
 - **Emby**: Get your API key from Emby Dashboard → Advanced → Security
-- **Jellyfin**: Get your API key from Jellyfin Dashboard → Administration → API Keys
 
 ---
 
