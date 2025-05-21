@@ -127,6 +127,8 @@ class EmbyClient(MediaServerClient):
     def get_library_item_ids_by_tmdb_ids(self, tmdb_ids: List[int]) -> List[str]:
         """
         Given a list of TMDb IDs, return the Emby server's internal item IDs for owned movies.
+        Uses direct provider ID lookup for enhanced performance.
+        
         Args:
             tmdb_ids: List of TMDb movie IDs.
         Returns:
@@ -134,56 +136,69 @@ class EmbyClient(MediaServerClient):
         """
         if not tmdb_ids:
             return []
-            
-        # Convert all IDs to strings for comparison
+        
+        # Convert all IDs to strings for comparison and lookup
         tmdb_ids_str = [str(id) for id in tmdb_ids]
         found_item_ids = []
         
-        # We need to scan the entire movie library to find the matching TMDb IDs
-        logger.info(f"Scanning library for {len(tmdb_ids)} TMDb movies...")
+        # Use a set to track which TMDb IDs we've already found to avoid duplicates
+        found_tmdb_ids = set()
+        total_to_find = len(tmdb_ids_str)
         
-        # First get all movies from the library
-        # Note this will only return the first 100-200 movies, so we need to page through results
+        logger.info(f"Searching for {total_to_find} TMDb movies using optimized batch lookup...")
+        
         try:
-            params = {
-                'IncludeItemTypes': 'Movie',
-                'Recursive': 'true',
-                'Fields': 'ProviderIds', # Make sure we get the TMDb ID in the provider IDs
-                'Limit': 100, # Fetch in batches of 100 to avoid overloading the server
-            }
-            endpoint = f"/Users/{self.user_id}/Items"
-            
-            # Initialize for pagination
-            start_index = 0
+            # Use Emby's AnyProviderIdEquals parameter to directly search for TMDb IDs
+            # Process in batches to avoid overloading the server with too many IDs at once
+            batch_size = 50  # Size of each TMDb ID batch
             total_found = 0
-            has_more = True
-            movie_batch_size = 100
+            batch_counter = 0
             
-            # Use set to track what we've already found to avoid duplicates
-            found_tmdb_ids = set()
-            
-            # Keep fetching until we have all items or find all our TMDb IDs
-            while has_more and len(found_tmdb_ids) < len(tmdb_ids_str):
-                params['StartIndex'] = start_index
-                logger.info(f"Fetching movies batch {start_index//movie_batch_size + 1}...")
+            for i in range(0, len(tmdb_ids_str), batch_size):
+                batch_counter += 1
+                batch = tmdb_ids_str[i:i+batch_size]
+                
+                # Generate a string of TMDb IDs in the format needed by Emby's API
+                # Format: "tmdb.12345,tmdb.67890,..." (each must be prefixed with tmdb.)
+                tmdb_id_query = ','.join([f"tmdb.{tmdb_id}" for tmdb_id in batch])
+                
+                params = {
+                    'IncludeItemTypes': 'Movie',
+                    'Recursive': 'true',
+                    'Fields': 'ProviderIds',
+                    'AnyProviderIdEquals': tmdb_id_query,
+                    # Critical: Set Limit to total_to_find to ensure we get all matches
+                    # Setting it to batch_size would limit results per batch
+                    'Limit': total_to_find,
+                    # Add a cache-busting parameter to avoid stale results
+                    '_cb': str(uuid.uuid4().hex),
+                }
+                
+                endpoint = f"/Users/{self.user_id}/Items"
+                
+                # Only log every 5th batch to reduce log spam
+                if batch_counter % 5 == 1:
+                    logger.info(f"Fetching batch {batch_counter} ({len(batch)} TMDb IDs)...")
                 
                 data = self._make_api_request('GET', endpoint, params=params)
                 if not data:
-                    break
-                    
-                total_items = data.get('TotalRecordCount', 0)
-                items = data.get('Items', [])
+                    logger.warning(f"No data returned for batch {batch_counter}")
+                    continue
                 
+                items = data.get('Items', [])
                 if not items:
-                    break
-                    
-                # Check each item for matching TMDb IDs
+                    continue
+                
+                # Track items found in this batch
+                batch_found = 0
+                
+                # Extract Emby item IDs and store matching TMDb IDs as found
                 for item in items:
                     provider_ids = item.get('ProviderIds', {})
                     if not provider_ids:
                         continue
-                        
-                    # TMDb IDs can be stored in multiple formats - try all common formats
+                    
+                    # Check for any recognized TMDb ID format
                     tmdb_id = None
                     if 'Tmdb' in provider_ids:
                         tmdb_id = provider_ids['Tmdb']
@@ -191,24 +206,36 @@ class EmbyClient(MediaServerClient):
                         tmdb_id = provider_ids['TMDb']
                     elif 'tmdb' in provider_ids:
                         tmdb_id = provider_ids['tmdb']
-                        
+                    
+                    # Only add items that match our search criteria and haven't been found before
                     if tmdb_id and tmdb_id in tmdb_ids_str and tmdb_id not in found_tmdb_ids:
                         found_item_ids.append(item['Id'])
                         found_tmdb_ids.add(tmdb_id)
-                        total_found += 1
-                        
-                # Update for next batch
-                start_index += len(items)
-                has_more = start_index < total_items
-                logger.info(f"Found {len(found_tmdb_ids)} of {len(tmdb_ids)} TMDb movies so far...")
+                        batch_found += 1
                 
-            logger.info(f"Completed library scan. Found {len(found_item_ids)} of {len(tmdb_ids)} TMDb movies.")
+                total_found += batch_found
+                
+                # Log progress but only every 5th batch or if this batch had significant finds
+                if batch_counter % 5 == 0 or batch_found > 0:
+                    logger.info(f"Found {total_found} of {total_to_find} TMDb movies so far...")
+                
+                # If we found everything, we can stop
+                if len(found_tmdb_ids) >= len(tmdb_ids_str):
+                    logger.info("Found all requested TMDb movies!")
+                    break
+                    
+            # Final summary
+            logger.info(f"Completed optimized lookup. Found {len(found_item_ids)} of {total_to_find} TMDb movies in {batch_counter} batches.")
+            
+            # If we found less than 80% of the movies, log a warning about potential configuration issues
+            if len(found_item_ids) < total_to_find * 0.8:
+                logger.warning(f"Found only {len(found_item_ids)} of {total_to_find} TMDb movies.")
+                logger.warning("If this is lower than expected, check that your TMDb IDs match those in Emby.")
+                logger.warning("Some films may need to be refreshed in Emby to update their TMDb provider IDs.")
             
         except Exception as e:
-            logger.error(f"Error scanning library for TMDb IDs: {e}")
+            logger.error(f"Error searching library for TMDb IDs: {e}")
             
-        # Return the item IDs we found
-        logger.info(f"Found total of {len(found_item_ids)} matching movies in Emby library")
         return found_item_ids
 
     def get_item_names_by_ids(self, item_ids: List[str]) -> dict:
