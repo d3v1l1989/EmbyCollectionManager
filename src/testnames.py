@@ -9,7 +9,13 @@ import logging
 from typing import List, Dict, Any, Optional
 import requests
 import argparse
-from dotenv import load_dotenv
+
+# Make dotenv optional
+try:
+    from dotenv import load_dotenv
+    has_dotenv = True
+except ImportError:
+    has_dotenv = False
 
 # Configure logging
 logging.basicConfig(
@@ -130,8 +136,12 @@ def main():
     
     args = parser.parse_args()
     
-    # Load .env file if it exists
-    load_dotenv()
+    # Load .env file if dotenv is available
+    if has_dotenv:
+        load_dotenv()
+    elif not args.server_url or not args.api_key or not args.user_id:
+        logger.warning("python-dotenv package not installed. Using command line or environment variables only.")
+        logger.warning("Install with: pip install python-dotenv")
     
     # Get credentials from environment or command line
     server_url = args.server_url or os.getenv("EMBY_SERVER_URL")
