@@ -247,6 +247,41 @@ class EmbyClient(MediaServerClient):
         print(f"Found total of {len(item_ids)} matching movies in Emby library")
         return item_ids
 
+    def get_item_names_by_ids(self, item_ids: List[str]) -> dict:
+        """
+        Get movie/item names by their IDs to provide better logging.
+        
+        Args:
+            item_ids: List of Emby item IDs
+            
+        Returns:
+            Dictionary mapping item IDs to their names
+        """
+        result = {}
+        
+        if not item_ids:
+            return result
+            
+        # Process items in batches to avoid making too many individual API calls
+        batch_size = 25
+        for i in range(0, len(item_ids), batch_size):
+            batch = item_ids[i:i+batch_size]
+            
+            try:
+                # Use comma-separated list of IDs to get details for multiple items at once
+                ids_param = ",".join(batch)
+                endpoint = f"/Items?Ids={ids_param}"
+                data = self._make_api_request('GET', endpoint)
+                
+                if data and 'Items' in data:
+                    for item in data['Items']:
+                        if 'Id' in item and 'Name' in item:
+                            result[item['Id']] = item['Name']
+            except Exception as e:
+                print(f"Error fetching names for batch of items: {e}")
+        
+        return result
+
     def update_collection_items(self, collection_id: str, item_ids: List[str]) -> bool:
         """
         Set the items for a given Emby collection.
@@ -275,68 +310,25 @@ class EmbyClient(MediaServerClient):
         print(f"Fetching movie details to prevent duplicates...")
         movie_names = {}
         deduplicated_ids = []
+        seen_ids = set()
         
+        # Also provide names for better logging
+        items_info = self.get_item_names_by_ids(item_ids)
+        
+        # Keep only unique items, in the original order
         for item_id in item_ids:
-            try:
-                # Use the Items endpoint to get movie details
-                item_url = f"{self.server_url}/Users/{self.user_id}/Items/{item_id}?api_key={self.api_key}"
-                response = self.session.get(item_url, timeout=15)
-                
-                if response.status_code == 200:
-                    item_data = response.json()
-                    movie_name = item_data.get('Name', '').lower()
-                    
-                    if movie_name and movie_name not in movie_names:
-                        # First time we've seen this movie name
-                        movie_names[movie_name] = item_id
-                        deduplicated_ids.append(item_id)
-                        print(f"  Including: {movie_name}")
-                    else:
-                        print(f"  Skipping duplicate: {movie_name}")
-            except Exception as e:
-                print(f"Error getting movie details for {item_id}: {e}")
-                # If we can't get details, include it anyway
-                if item_id not in deduplicated_ids:
-                    deduplicated_ids.append(item_id)
+            if item_id not in seen_ids:
+                deduplicated_ids.append(item_id)
+                seen_ids.add(item_id)
+                movie_name = items_info.get(item_id, f"Unknown (ID: {item_id})")
+                print(f"  Adding: {movie_name}")
+            else:
+                movie_name = items_info.get(item_id, f"Unknown (ID: {item_id})")
+                print(f"  Skipping duplicate: {movie_name}")
         
-        print(f"After deduplication: {len(deduplicated_ids)} of {len(item_ids)} movies remain")
-        
-        if not deduplicated_ids:
-            print("No items remain after deduplication")
-            return False
-        
-        # Try to add the items to the collection and preserve our sort order
+        # Try to add the items to the collection
         try:
-            # First we need to assign ForcedSortName values to each item to enforce our order
-            # This is CRITICAL for preserving the order in Emby
-            for index, item_id in enumerate(deduplicated_ids):
-                try:
-                    # Assign sequential sort values with a special prefix (!!!)
-                    # The padding ensures proper lexicographic sorting
-                    sort_index = str(1000000 - index).zfill(7)  # Reverse order: higher index = earlier in list
-                    
-                    # Use a special prefix pattern (!!!) which Emby recognizes for custom sorting
-                    # The prefix, plus a large enough number that decreases with each item ensures proper sorting
-                    
-                    # Update the item with only the ForcedSortName - this is the key fix
-                    # SortName is a read-only property, but ForcedSortName can be modified
-                    item_update_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
-                    
-                    # Set only the one property we can actually modify
-                    item_update_data = {
-                        "Id": item_id,
-                        "ForcedSortName": f"!!!{sort_index}"  # !!! prefix ensures these sort before normal items
-                    }
-                    
-                    print(f"  Setting ForcedSortName for item {item_id} to '!!!{sort_index}'")
-                    item_update_response = self.session.post(item_update_url, json=item_update_data, timeout=15)
-                    
-                    if item_update_response.status_code not in [200, 204]:
-                        print(f"  Warning: Failed to set ForcedSortName for item {item_id}: {item_update_response.status_code}")
-                except Exception as e:
-                    print(f"  Error setting ForcedSortName for item {item_id}: {e}")
-            
-            # Now update the collection items
+            # Update the collection items
             endpoint = f"/Collections/{collection_id}/Items"            
             params = {"Ids": ",".join(deduplicated_ids)}
             print(f"Adding {len(deduplicated_ids)} items to collection {collection_id}...")
@@ -360,31 +352,12 @@ class EmbyClient(MediaServerClient):
             if response.status_code == 204:
                 print(f"Successfully updated collection with {len(deduplicated_ids)} items")
                 
-                # Now update the collection to use manual sorting (preserves our ordering)
-                # This is a crucial step to prevent Emby from applying its own default sorting
-                collection_update_endpoint = f"/Items/{collection_id}"
-                collection_update_url = f"{self.server_url}{collection_update_endpoint}?api_key={self.api_key}"
-                
-                # For collections, Emby respects ForcedSortName values when DisplayOrder is set to SortName
-                # Setting DisplayOrder to SortName tells Emby to sort by the custom sort values we've assigned
-                update_data = {
-                    "Id": collection_id,
-                    "IsFolder": True,
-                    "Type": "BoxSet",
-                    "PreferredMetadataLanguage": "en",
-                    "PreferredMetadataCountryCode": "US",
-                    "DisplayOrder": "SortName"  # This tells Emby to use our ForcedSortName values
-                }
-                
-                print(f"Setting collection to use SortName display order to preserve our custom ordering...")
-                update_response = self.session.post(collection_update_url, json=update_data, timeout=30)
-                
-                if update_response.status_code in [200, 204]:
-                    print(f"Successfully set manual sort order for collection")
-                else:
-                    print(f"Warning: Failed to set manual sort order for collection: {update_response.status_code}")
-                    if update_response.text:
-                        print(f"Response: {update_response.text[:200]}")
+                print(f"NOTE: To customize display order, use the Emby web UI:")
+                print(f"  1. Find the collection and click the '...' menu")
+                print(f"  2. Select 'Edit metadata'")
+                print(f"  3. Change 'Display order' to your preferred option")
+                print(f"  4. For franchise collections, use 'Release date'")
+                print(f"  5. For popular collections, use 'Popularity'")
                 
                 return True
             else:
@@ -395,7 +368,7 @@ class EmbyClient(MediaServerClient):
         except Exception as e:
             print(f"Error updating collection items: {e}")
             return False
-        
+
     def update_collection_artwork(self, collection_id: str, poster_url: Optional[str]=None, backdrop_url: Optional[str]=None) -> bool:
         """
         Update artwork for an Emby collection using external image URLs.
