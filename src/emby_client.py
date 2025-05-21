@@ -79,61 +79,44 @@ class EmbyClient(MediaServerClient):
                                 try:
                                     remove_url = f"{self.server_url}/Collections/{data['Id']}/Items?api_key={self.api_key}&Ids={sample_item_id}"
                                     print(f"Removing temporary item {sample_item_id} from collection...")
-                                    remove_response = self.session.delete(remove_url, timeout=15)
+                                    remove_response = self.session.post(remove_url, timeout=15)
+                                    
                                     if remove_response.status_code == 204:
                                         print(f"Successfully removed temporary item from collection")
                                     else:
-                                        print(f"Note: Could not remove temporary item {sample_item_id} (status: {remove_response.status_code})")
+                                        print(f"Warning: Failed to remove temporary item from collection: {remove_response.status_code}")
                                 except Exception as e:
-                                    print(f"Error removing temporary item: {e}")
+                                    print(f"Error removing temporary item from collection: {e}")
                                 
                                 return data['Id']
+                            else:
+                                print(f"Invalid response data when creating collection: {data}")
                         except Exception as e:
-                            print(f"Error parsing response: {e}")
-                            print(f"Response content: {response.text[:100]}...")
+                            print(f"Error parsing collection creation response: {e}")
+                    else:
+                        print(f"Collection creation failed: {response.status_code}")
+                        if response.text:
+                            print(f"Response: {response.text}")
                 except Exception as e:
                     print(f"Error creating collection: {e}")
-                
-                # Method 2: Try with parameters instead of direct URL
-                try:
-                    url = f"{self.server_url}/Collections"
-                    params = {
-                        'api_key': self.api_key,
-                        'IsLocked': 'true',  # The other code uses 'true' instead of 'false'
-                        'Name': collection_name,
-                        'Ids': sample_item_id  # This is the key - need an item ID
-                    }
-                    
-                    print(f"Trying alternative method with sample item ID...")
-                    response = self.session.post(url, params=params, timeout=15)
-                    
-                    if response.status_code == 200 and response.text:
-                        try:
-                            data = response.json()
-                            if data and 'Id' in data:
-                                print(f"Alternative method worked! Created collection with ID: {data['Id']}")
-                                return data['Id']
-                        except Exception as e:
-                            print(f"Error parsing alternative response: {e}")
-                except Exception as e:
-                    print(f"Alternative method failed: {e}")
             else:
-                print("No sample items found in the library. Cannot create collection without items.")
-            
-            # If all else fails, use a temporary ID
-            print(f"All collection creation methods failed for '{collection_name}'")
-            import hashlib
-            temp_id = hashlib.md5(collection_name.encode()).hexdigest()
-            self._temp_collections = getattr(self, '_temp_collections', {})
-            self._temp_collections[temp_id] = collection_name
-            print(f"Using temporary ID: {temp_id}")
-            print(f"IMPORTANT: Please manually create a collection named '{collection_name}' in Emby")
-            return temp_id
-            
+                print("No sample item found to use for collection creation")
+                
+            # If we get here, collection creation failed
+            # Create a fake ID and remember the collection name for later reporting
+            # This is just to allow the process to continue for other collections
+            if not hasattr(self, '_temp_collections'):
+                self._temp_collections = {}
+                
+            fake_id = str(uuid.uuid4())
+            self._temp_collections[fake_id] = collection_name
+            print(f"Created temporary placeholder ID for collection '{collection_name}': {fake_id}")
+            print(f"Please create this collection manually in your Emby web interface.")
+            return fake_id
         except Exception as e:
-            print(f"Error during collection creation process: {e}")
+            print(f"Error during collection creation: {e}")
             return None
-
+            
     def get_library_item_ids_by_tmdb_ids(self, tmdb_ids: List[int]) -> List[str]:
         """
         Given a list of TMDb IDs, return the Emby server's internal item IDs for owned movies.
@@ -142,110 +125,84 @@ class EmbyClient(MediaServerClient):
         Returns:
             List of Emby item IDs (str).
         """
-        item_ids = []
-        total_to_find = len(tmdb_ids)
-        print(f"Searching for {total_to_find} movies in Emby library by TMDb IDs")
-        
-        # Define batch size to prevent too long URLs
-        batch_size = 50
-        
-        # First try the batched approach with AnyProviderIdEquals like the other client does
-        try:
-            # Convert all TMDb IDs to strings and add 'tmdb.' prefix
-            tmdb_id_strings = [f"tmdb.{tmdb_id}" for tmdb_id in tmdb_ids]
+        if not tmdb_ids:
+            return []
             
-            # Process in batches to avoid URL length limits
-            for i in range(0, len(tmdb_id_strings), batch_size):
-                batch = tmdb_id_strings[i:i+batch_size]
-                provider_ids_str = ",".join(batch)
+        # Convert all IDs to strings for comparison
+        tmdb_ids_str = [str(id) for id in tmdb_ids]
+        found_item_ids = []
+        
+        # We need to scan the entire movie library to find the matching TMDb IDs
+        print(f"Scanning library for {len(tmdb_ids)} TMDb movies...")
+        
+        # First get all movies from the library
+        # Note this will only return the first 100-200 movies, so we need to page through results
+        try:
+            params = {
+                'IncludeItemTypes': 'Movie',
+                'Recursive': 'true',
+                'Fields': 'ProviderIds', # Make sure we get the TMDb ID in the provider IDs
+                'Limit': 100, # Fetch in batches of 100 to avoid overloading the server
+            }
+            endpoint = f"/Users/{self.user_id}/Items"
+            
+            # Initialize for pagination
+            start_index = 0
+            total_found = 0
+            has_more = True
+            movie_batch_size = 100
+            
+            # Use set to track what we've already found to avoid duplicates
+            found_tmdb_ids = set()
+            
+            # Keep fetching until we have all items or find all our TMDb IDs
+            while has_more and len(found_tmdb_ids) < len(tmdb_ids_str):
+                params['StartIndex'] = start_index
+                print(f"Fetching movies batch {start_index//movie_batch_size + 1}...")
                 
-                params = {
-                    'Recursive': 'true',
-                    'IncludeItemTypes': 'Movie',
-                    'Fields': 'ProviderIds,Path',
-                    'AnyProviderIdEquals': provider_ids_str,
-                    'Limit': batch_size
-                }
-                
-                endpoint = f"/Users/{self.user_id}/Items"
-                print(f"Searching batch {i//batch_size + 1} with {len(batch)} TMDb IDs")
                 data = self._make_api_request('GET', endpoint, params=params)
-                
-                if data and 'Items' in data and data['Items']:
-                    batch_matches = len(data['Items'])
-                    print(f"Found {batch_matches} matches in batch {i//batch_size + 1}")
+                if not data:
+                    break
                     
-                    for item in data['Items']:
-                        name = item.get('Name', '(unknown)')
-                        item_id = item['Id']
-                        print(f"  - Found match: {name} (ID: {item_id})")
-                        if item_id not in item_ids:  # Avoid duplicates
-                            item_ids.append(item_id)
+                total_items = data.get('TotalRecordCount', 0)
+                items = data.get('Items', [])
+                
+                if not items:
+                    break
+                    
+                # Check each item for matching TMDb IDs
+                for item in items:
+                    provider_ids = item.get('ProviderIds', {})
+                    if not provider_ids:
+                        continue
+                        
+                    # TMDb IDs can be stored in multiple formats - try all common formats
+                    tmdb_id = None
+                    if 'Tmdb' in provider_ids:
+                        tmdb_id = provider_ids['Tmdb']
+                    elif 'TMDb' in provider_ids:
+                        tmdb_id = provider_ids['TMDb']
+                    elif 'tmdb' in provider_ids:
+                        tmdb_id = provider_ids['tmdb']
+                        
+                    if tmdb_id and tmdb_id in tmdb_ids_str and tmdb_id not in found_tmdb_ids:
+                        found_item_ids.append(item['Id'])
+                        found_tmdb_ids.add(tmdb_id)
+                        total_found += 1
+                        
+                # Update for next batch
+                start_index += len(items)
+                has_more = start_index < total_items
+                print(f"Found {len(found_tmdb_ids)} of {len(tmdb_ids)} TMDb movies so far...")
+                
+            print(f"Completed library scan. Found {len(found_item_ids)} of {len(tmdb_ids)} TMDb movies.")
+            
         except Exception as e:
-            print(f"Error searching by batched provider IDs: {e}")
-        
-        # If we didn't find many matches, try the direct approach using all movies
-        if len(item_ids) < total_to_find / 10:  # If we found less than 10% of movies
-            print(f"Only found {len(item_ids)} movies with batch method, trying full library scan...")
-            try:
-                # Get all movies and manually check TMDb IDs
-                params = {
-                    'Recursive': 'true',
-                    'IncludeItemTypes': 'Movie',
-                    'Fields': 'ProviderIds,Path',
-                    'Limit': 200  # Get more movies at once
-                }
-                
-                # Convert TMDb IDs to strings for comparison
-                tmdb_str_ids = set(str(tmdb_id) for tmdb_id in tmdb_ids)
-                
-                endpoint = f"/Users/{self.user_id}/Items"
-                data = self._make_api_request('GET', endpoint, params=params)
-                
-                if data and 'Items' in data:
-                    movies_count = len(data['Items'])
-                    print(f"Scanning {movies_count} movies in library for TMDb ID matches")
-                    
-                    for item in data['Items']:
-                        if 'ProviderIds' in item:
-                            provider_ids = item['ProviderIds']
-                            # Check for TMDb ID in any case format
-                            for key in ['Tmdb', 'tmdb', 'TMDB']:
-                                if key in provider_ids and provider_ids[key] in tmdb_str_ids:
-                                    name = item.get('Name', '(unknown)')
-                                    item_id = item['Id']
-                                    print(f"Found match via scan: {name} (ID: {item_id})")
-                                    if item_id not in item_ids:  # Avoid duplicates
-                                        item_ids.append(item_id)
-                                    break
-            except Exception as e:
-                print(f"Error scanning full library: {e}")
-        
-        # If we still have very few movies, add some recent popular ones as a fallback
-        if len(item_ids) < 5:
-            print("Found very few matches. Adding some recent popular movies as fallback...")
-            try:
-                params = {
-                    'Recursive': 'true',
-                    'IncludeItemTypes': 'Movie',
-                    'SortBy': 'DateCreated,SortName',  # Recently added
-                    'SortOrder': 'Descending',
-                    'Limit': 20
-                }
-                data = self._make_api_request('GET', endpoint, params=params)
-                if data and 'Items' in data:
-                    for item in data['Items']:
-                        if item['Id'] not in item_ids:  # Avoid duplicates
-                            item_ids.append(item['Id'])
-                            print(f"Added fallback movie: {item.get('Name', '(unknown)')} (ID: {item['Id']})")
-                            # Stop after we've added enough fallbacks
-                            if len(item_ids) >= 20:
-                                break
-            except Exception as e:
-                print(f"Error adding fallback movies: {e}")
-        
-        print(f"Found total of {len(item_ids)} matching movies in Emby library")
-        return item_ids
+            print(f"Error scanning library for TMDb IDs: {e}")
+            
+        # Return the item IDs we found
+        print(f"Found total of {len(found_item_ids)} matching movies in Emby library")
+        return found_item_ids
 
     def get_item_names_by_ids(self, item_ids: List[str]) -> dict:
         """
@@ -291,47 +248,72 @@ class EmbyClient(MediaServerClient):
         Returns:
             True if successful, False otherwise.
         """
+        if not collection_id or not item_ids:
+            print("Error: Invalid collection_id or empty item_ids list")
+            return False
+        
         # Check if this is a pseudo-ID for a collection we couldn't create
         if hasattr(self, '_temp_collections') and collection_id in self._temp_collections:
             collection_name = self._temp_collections[collection_id]
-            print(f"This is a pseudo-collection '{collection_name}'. Can't add items via API.")
-            print(f"If you want to use this collection, please manually create a collection named:")
-            print(f"'{collection_name}' in your Emby web interface before running this tool.")
+            print(f"Cannot update items for pseudo-collection '{collection_name}'")
+            print(f"To add items, create the collection manually in your Emby web interface.")
             # We'll pretend it succeeded since we can't do anything about it
             return True
-            
-        if not item_ids:
-            print("No items to add to collection")
-            return False
-            
-        # For real collection IDs, we need to aggressively deduplicate items
-        # First, get all movie names to avoid adding duplicate movies with different IDs
-        # This handles cases where the same movie exists in multiple qualities
-        print(f"Fetching movie details to prevent duplicates...")
-        movie_names = {}
-        deduplicated_ids = []
-        seen_ids = set()
         
-        # Also provide names for better logging
+        # First get current collection items to avoid duplicates
+        current_items = []
+        try:
+            # Get current collection items
+            endpoint = f"/Collections/{collection_id}/Items"
+            get_url = f"{self.server_url}{endpoint}?api_key={self.api_key}"
+            response = self.session.get(get_url, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'Items' in data:
+                    current_items = [item['Id'] for item in data['Items']]
+                    print(f"Collection currently has {len(current_items)} items")
+        except Exception as e:
+            print(f"Warning: Could not get current collection items: {e}")
+        
+        # Create a set for existing IDs to avoid duplicating them
+        existing_ids = set(current_items)
+        new_ids = []
+        
+        # Get item details for better logging
         items_info = self.get_item_names_by_ids(item_ids)
         
-        # Keep only unique items, in the original order
+        # Check for duplicates and existing items
+        added_in_this_run = set()
         for item_id in item_ids:
-            if item_id not in seen_ids:
-                deduplicated_ids.append(item_id)
-                seen_ids.add(item_id)
+            # Skip if this item is already in the collection
+            if item_id in existing_ids:
                 movie_name = items_info.get(item_id, f"Unknown (ID: {item_id})")
-                print(f"  Adding: {movie_name}")
-            else:
+                print(f"  Skipping existing item: {movie_name}")
+                continue
+                
+            # Skip if we've already added this item in this run
+            if item_id in added_in_this_run:
                 movie_name = items_info.get(item_id, f"Unknown (ID: {item_id})")
                 print(f"  Skipping duplicate: {movie_name}")
+                continue
+            
+            # This is a new, unique item
+            new_ids.append(item_id)
+            added_in_this_run.add(item_id)
+            movie_name = items_info.get(item_id, f"Unknown (ID: {item_id})")
+            print(f"  Adding new item: {movie_name}")
         
-        # Try to add the items to the collection
+        # If no new items to add, we're done
+        if not new_ids:
+            print("No new items to add to collection")
+            return True
+            
+        # Add the new items to the collection
         try:
-            # Update the collection items
             endpoint = f"/Collections/{collection_id}/Items"            
-            params = {"Ids": ",".join(deduplicated_ids)}
-            print(f"Adding {len(deduplicated_ids)} items to collection {collection_id}...")
+            params = {"Ids": ",".join(new_ids)}
+            print(f"Adding {len(new_ids)} new items to collection {collection_id}...")
             
             # Use direct request because we're expecting a 204 response, not JSON
             url = f"{self.server_url}{endpoint}"
@@ -345,19 +327,43 @@ class EmbyClient(MediaServerClient):
             for key, value in params.items():
                 url += f"&{key}={value}"
             
-            print(f"Updating collection with {len(deduplicated_ids)} items")
-            
+            # Send the request to add items
             response = self.session.post(url, timeout=30)
             
             if response.status_code == 204:
-                print(f"Successfully updated collection with {len(deduplicated_ids)} items")
+                print(f"Successfully added {len(new_ids)} new items to collection")
                 
-                print(f"NOTE: To customize display order, use the Emby web UI:")
-                print(f"  1. Find the collection and click the '...' menu")
+                # Now try to set the display order for boxsets
+                try:
+                    # Get the collection metadata
+                    collection_url = f"{self.server_url}/Items/{collection_id}?api_key={self.api_key}"
+                    collection_response = self.session.get(collection_url, timeout=30)
+                    
+                    if collection_response.status_code == 200:
+                        collection_data = collection_response.json()
+                        
+                        # Update the collection to use sorting by release date
+                        update_data = {
+                            "Id": collection_id,
+                            "CollectionSortOrder": "PremiereDate"
+                        }
+                        
+                        update_url = f"{self.server_url}/Items/{collection_id}?api_key={self.api_key}"
+                        update_response = self.session.post(update_url, json=update_data, timeout=30)
+                        
+                        if update_response.status_code in [200, 204]:
+                            print("Successfully updated collection sort order")
+                        else:
+                            print(f"Note: Could not update collection sort order: {update_response.status_code}")
+                except Exception as e:
+                    print(f"Note: Error during collection sort preference update: {e}")
+                
+                print(f"\nIMPORTANT: If items are still sorted incorrectly, please use the Emby web UI:")
+                print(f"  1. Navigate to the collection and click the '...' menu")
                 print(f"  2. Select 'Edit metadata'")
-                print(f"  3. Change 'Display order' to your preferred option")
-                print(f"  4. For franchise collections, use 'Release date'")
-                print(f"  5. For popular collections, use 'Popularity'")
+                print(f"  3. Change 'Display order' to your preferred option:")
+                print(f"     - For franchise collections, use 'Release date'")
+                print(f"     - For popular collections, use 'Popularity'")
                 
                 return True
             else:
