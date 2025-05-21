@@ -127,6 +127,7 @@ class JellyfinClient(MediaServerClient):
             List of Jellyfin item IDs (str).
         """
         item_ids = []
+        all_found_ids = set()  # Track all found item IDs across all methods
         total_to_find = len(tmdb_ids)
         print(f"Searching for {total_to_find} movies in Jellyfin library by TMDb IDs")
         
@@ -163,11 +164,15 @@ class JellyfinClient(MediaServerClient):
                         name = item.get('Name', '(unknown)')
                         item_id = item['Id']
                         print(f"  - Found match: {name} (ID: {item_id})")
-                        if item_id not in item_ids:  # Avoid duplicates
+                        if item_id not in all_found_ids:  # Avoid duplicates across batches
+                            all_found_ids.add(item_id)
                             item_ids.append(item_id)
+            
+            # After all batches, report how many items we found
+            print(f"Found {len(item_ids)} movies out of {total_to_find} requested TMDb IDs")
         except Exception as e:
             print(f"Error searching by batched provider IDs: {e}")
-        
+                
         # If we didn't find many matches, try the direct approach using all movies
         if len(item_ids) < total_to_find / 10:  # If we found less than 10% of movies
             print(f"Only found {len(item_ids)} movies with batch method, trying full library scan...")
@@ -199,7 +204,8 @@ class JellyfinClient(MediaServerClient):
                                     name = item.get('Name', '(unknown)')
                                     item_id = item['Id']
                                     print(f"Found match via scan: {name} (ID: {item_id})")
-                                    if item_id not in item_ids:  # Avoid duplicates
+                                    if item_id not in all_found_ids:  # Avoid duplicates
+                                        all_found_ids.add(item_id)
                                         item_ids.append(item_id)
                                     break
             except Exception as e:
@@ -220,7 +226,8 @@ class JellyfinClient(MediaServerClient):
                 data = self._make_api_request('GET', endpoint, params=params)
                 if data and 'Items' in data:
                     for item in data['Items']:
-                        if item['Id'] not in item_ids:  # Avoid duplicates
+                        if item['Id'] not in all_found_ids:  # Avoid duplicates
+                            all_found_ids.add(item['Id'])
                             item_ids.append(item['Id'])
                             print(f"Added fallback movie: {item.get('Name', '(unknown)')} (ID: {item['Id']})")
                             # Stop after we've added enough fallbacks
