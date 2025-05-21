@@ -315,7 +315,7 @@ class EmbyClient(MediaServerClient):
                 logger.info(f"Successfully set items in collection {collection_id}.")
 
                 # 2. Set and VERIFY the Collection's DisplayOrder to "SortName"
-                logger.info(f"Attempting to set collection {collection_id} DisplayOrder to SortName...")
+                logger.info(f"Attempting to set collection {collection_id} DisplayOrder to ProductionYear (SortOrder: Descending)...")
                 
                 # Initialize update_response to None to track if we attempted the update
                 update_response = None
@@ -338,7 +338,7 @@ class EmbyClient(MediaServerClient):
                     collection_metadata_payload["SortOrder"] = "Descending"
                     
                     # Ensure other sorting-related fields are properly set
-                    collection_metadata_payload["SortBy"] = "ProductionYear,SortName"  # Backup sort by name
+                    collection_metadata_payload["SortBy"] = "ProductionYear"
                     collection_metadata_payload["SortByPremiereDate"] = False
                     collection_metadata_payload["SortByPremiereFirst"] = False
                     
@@ -354,7 +354,7 @@ class EmbyClient(MediaServerClient):
                 
                 # Only perform verification if we attempted the update
                 if display_order_update_attempted and update_response and update_response.status_code in [200, 204]:
-                    logger.info(f"Attempt to set collection DisplayOrder to SortName successful (HTTP {update_response.status_code}). Verifying...")
+                    logger.info(f"Attempt to set collection DisplayOrder to ProductionYear (SortOrder: Descending) successful (HTTP {update_response.status_code}). Verifying...")
                     
                     # *** IMMEDIATE VERIFICATION ***
                     verification_url = f"{self.server_url}/Users/{self.user_id}/Items/{collection_id}?api_key={self.api_key}&Fields=DisplayOrder,SortOrder,Name"
@@ -378,16 +378,16 @@ class EmbyClient(MediaServerClient):
                 # No need to set individual item sort names as we're using year-based sorting now
                 logger.info(f"Using year-based descending order for collection {collection_id} items.")
                 
-                # Optional: Trigger a refresh on the collection
-                # try:
-                #     refresh_url = f"{self.server_url}/Items/{collection_id}/Refresh?api_key={self.api_key}"
-                #     refresh_response = self.session.post(refresh_url, timeout=30)
-                #     if refresh_response.status_code in [200, 204]:
-                #         logger.info(f"Successfully sent refresh command for collection {collection_id}.")
-                #     else:
-                #         logger.warning(f"Failed to send refresh command for collection {collection_id}: {refresh_response.status_code}")
-                # except Exception as e_refresh:
-                #     logger.warning(f"Error sending refresh command: {e_refresh}")
+                                # Optional: Trigger a refresh on the collection
+                try:
+                    refresh_url = f"{self.server_url}/Items/{collection_id}/Refresh?api_key={self.api_key}"
+                    refresh_response = self.session.post(refresh_url, timeout=30)
+                    if refresh_response.status_code in [200, 204]:
+                        logger.info(f"Successfully sent refresh command for collection {collection_id}.")
+                    else:
+                        logger.warning(f"Failed to send refresh command for collection {collection_id}: {refresh_response.status_code}")
+                except Exception as e_refresh:
+                    logger.warning(f"Error sending refresh command: {e_refresh}")
                 
                 return True # Overall success if items were added, even if metadata tweaks had issues
             else:
