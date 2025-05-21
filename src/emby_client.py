@@ -416,39 +416,69 @@ class EmbyClient(MediaServerClient):
             target_sort_name = f"{prefix}{item_name_for_log}"
             
             try:
-                # 1. GET the full item data from the user-specific endpoint
+                # APPROACH 1: Update the main item metadata
                 item_data_get_url = f"/Users/{self.user_id}/Items/{item_id}"
                 current_item_data = self._make_api_request('GET', item_data_get_url)
                 
                 if not current_item_data:
-                    logger.error(f"Failed to GET item data for {item_name_for_log} (ID: {item_id}) before SortName update.")
+                    logger.error(f"Failed to GET item data for {item_name_for_log} (ID: {item_id}) before update.")
                     all_successful = False
                     continue
-
-                # 2. Prepare the payload for POST - start with the fetched data
-                update_payload = current_item_data.copy() # Start with all existing data
-
-                # 3. Update the SortName and ForcedSortName
+            
+                # Update the main item
+                update_payload = current_item_data.copy()
                 update_payload['SortName'] = target_sort_name
-                update_payload['ForcedSortName'] = target_sort_name # Good to set both
-
-                # 4. Ensure LockedFields allows SortName to be changed
-                # If 'LockedFields' is not in current_item_data or is None, initialize it
+                update_payload['ForcedSortName'] = target_sort_name
+                
+                # Ensure LockedFields allows SortName to be changed
                 locked_fields = update_payload.get('LockedFields') if isinstance(update_payload.get('LockedFields'), list) else []
-                # Remove SortName and ForcedSortName from locked fields if they are there
                 locked_fields = [field for field in locked_fields if field not in ['SortName', 'ForcedSortName']]
                 update_payload['LockedFields'] = locked_fields
                 
-                # 5. POST the modified full item data back
-                # The endpoint for item update is /Items/{Id}, not user-specific for the POST here.
                 item_update_url = f"{self.server_url}/Items/{item_id}?api_key={self.api_key}"
-                response = self.session.post(item_update_url, json=update_payload, timeout=15)
+                response1 = self.session.post(item_update_url, json=update_payload, timeout=15)
                 
-                if response.status_code not in [200, 204]: # 200 OK or 204 No Content
-                    logger.error(f"Failed to set SortName for {item_name_for_log} (ID: {item_id}). Status: {response.status_code} - {response.text[:200]}")
+                # APPROACH 2: Also update the display preferences (user-specific)
+                # This is a separate update to the user-specific display preferences
+                pref_url = f"{self.server_url}/DisplayPreferences/items/{item_id}?api_key={self.api_key}&userId={self.user_id}"
+                
+                # First get current preferences
+                pref_get_response = self.session.get(pref_url, timeout=15)
+                pref_data = {}
+                
+                if pref_get_response.status_code == 200:
+                    try:
+                        pref_data = pref_get_response.json()
+                    except:
+                        pref_data = {}
+                
+                # Now update with the SortName fields
+                pref_data = pref_data or {}
+                if 'CustomPrefs' not in pref_data:
+                    pref_data['CustomPrefs'] = {}
+                    
+                pref_data['CustomPrefs']['SortName'] = target_sort_name
+                pref_data['CustomPrefs']['ForcedSortName'] = target_sort_name
+                pref_data['ItemId'] = item_id
+                pref_data['UserId'] = self.user_id
+                
+                # Post updated preferences
+                response2 = self.session.post(pref_url, json=pref_data, timeout=15)
+                
+                # APPROACH 3: Also do a direct override with the API key in the URL
+                override_url = f"{self.server_url}/Items/{item_id}/SortName?api_key={self.api_key}"
+                override_data = {"SortName": target_sort_name}
+                response3 = self.session.post(override_url, json=override_data, timeout=15)
+                
+                success = (response1.status_code in [200, 204] and 
+                          response2.status_code in [200, 204, 404] and  # 404 is OK for prefs - it might not exist
+                          response3.status_code in [200, 204, 404])  # 404 is OK - endpoint might not exist
+                
+                if not success:
+                    logger.error(f"Failed to set SortName for {item_name_for_log}. Status codes: Item:{response1.status_code}, Prefs:{response2.status_code}, Override:{response3.status_code}")
                     all_successful = False
                 else:
-                    logger.info(f"Set SortName: {target_sort_name} for {item_name_for_log} (ID: {item_id}) (HTTP {response.status_code})")
+                    logger.info(f"Set SortName: {target_sort_name} for {item_name_for_log} (ID: {item_id})")
                     
             except Exception as e:
                 logger.error(f"Exception setting SortName for {item_name_for_log} (ID: {item_id}): {e}")
