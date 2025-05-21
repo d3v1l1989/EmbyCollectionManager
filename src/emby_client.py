@@ -270,59 +270,94 @@ class EmbyClient(MediaServerClient):
             return False
             
         # For real collection IDs, we need to aggressively deduplicate items
-        try:
-            # First, get all movie names to avoid adding duplicate movies with different IDs
-            # This handles cases where the same movie exists in multiple qualities
-            print(f"Fetching movie details to prevent duplicates...")
-            movie_names = {}
-            deduplicated_ids = []
-            
-            for item_id in item_ids:
-                try:
-                    # Use the Items endpoint to get movie details
-                    item_url = f"{self.server_url}/Users/{self.user_id}/Items/{item_id}?api_key={self.api_key}"
-                    response = self.session.get(item_url, timeout=15)
+        # First, get all movie names to avoid adding duplicate movies with different IDs
+        # This handles cases where the same movie exists in multiple qualities
+        print(f"Fetching movie details to prevent duplicates...")
+        movie_names = {}
+        deduplicated_ids = []
+        
+        for item_id in item_ids:
+            try:
+                # Use the Items endpoint to get movie details
+                item_url = f"{self.server_url}/Users/{self.user_id}/Items/{item_id}?api_key={self.api_key}"
+                response = self.session.get(item_url, timeout=15)
+                
+                if response.status_code == 200:
+                    item_data = response.json()
+                    movie_name = item_data.get('Name', '').lower()
                     
-                    if response.status_code == 200:
-                        item_data = response.json()
-                        movie_name = item_data.get('Name', '').lower()
-                        
-                        if movie_name and movie_name not in movie_names:
-                            # First time we've seen this movie name
-                            movie_names[movie_name] = item_id
-                            deduplicated_ids.append(item_id)
-                            print(f"  Including: {movie_name}")
-                        else:
-                            print(f"  Skipping duplicate: {movie_name}")
-                except Exception as e:
-                    print(f"Error getting movie details for {item_id}: {e}")
-                    # If we can't get details, include it anyway
-                    if item_id not in deduplicated_ids:
+                    if movie_name and movie_name not in movie_names:
+                        # First time we've seen this movie name
+                        movie_names[movie_name] = item_id
                         deduplicated_ids.append(item_id)
+                        print(f"  Including: {movie_name}")
+                    else:
+                        print(f"  Skipping duplicate: {movie_name}")
+            except Exception as e:
+                print(f"Error getting movie details for {item_id}: {e}")
+                # If we can't get details, include it anyway
+                if item_id not in deduplicated_ids:
+                    deduplicated_ids.append(item_id)
+        
+        print(f"After deduplication: {len(deduplicated_ids)} of {len(item_ids)} movies remain")
+        
+        if not deduplicated_ids:
+            print("No items remain after deduplication")
+            return False
+        
+        # Try to add the items to the collection and preserve our sort order
+        try:
+            # First update the collection items
+            endpoint = f"/Collections/{collection_id}/Items"            
+            params = {"Ids": ",".join(deduplicated_ids)}
+            print(f"Adding {len(deduplicated_ids)} items to collection {collection_id}...")
             
-            print(f"After deduplication: {len(deduplicated_ids)} of {len(item_ids)} movies remain")
+            # Use direct request because we're expecting a 204 response, not JSON
+            url = f"{self.server_url}{endpoint}"
+            if "?" in url:
+                url += "&"
+            else:
+                url += "?"
+            url += f"api_key={self.api_key}"
             
-            if not deduplicated_ids:
-                print("No items remain after deduplication")
-                return False
+            # Add parameters
+            for key, value in params.items():
+                url += f"&{key}={value}"
             
-            # Now add the deduplicated items to the collection
-            ids_param = ",".join(deduplicated_ids)
-            url = f"{self.server_url}/Collections/{collection_id}/Items"
+            print(f"Updating collection with {len(deduplicated_ids)} items")
             
-            params = {
-                'api_key': self.api_key,
-                'Ids': ids_param
-            }
+            response = self.session.post(url, timeout=30)
             
-            print(f"Adding {len(deduplicated_ids)} unique items to collection {collection_id}")
-            print(f"First few items: {deduplicated_ids[:3] if len(deduplicated_ids) > 3 else deduplicated_ids}")
-            
-            response = self.session.post(url, params=params, timeout=15)
-            
-            # Emby returns 204 No Content on success
             if response.status_code == 204:
-                print(f"Successfully added {len(deduplicated_ids)} unique items to collection {collection_id}")
+                print(f"Successfully updated collection with {len(deduplicated_ids)} items")
+                
+                # Now update the collection to use manual sorting (preserves our ordering)
+                # This is a crucial step to prevent Emby from applying its own default sorting
+                collection_update_endpoint = f"/Items/{collection_id}"
+                collection_update_url = f"{self.server_url}{collection_update_endpoint}?api_key={self.api_key}"
+                
+                # Set SortName to "" to force manual sorting mode, which preserves the order of the items we added
+                update_data = {
+                    "Id": collection_id,
+                    "SortName": "",  # Empty sort name enables manual sorting
+                    "ForcedSortName": "",
+                    "IsFolder": True,
+                    "Type": "BoxSet",
+                    "PreferredMetadataLanguage": "en",
+                    "PreferredMetadataCountryCode": "US",
+                    "DisplayOrder": "Manual"  # This is the key setting to preserve our order
+                }
+                
+                print(f"Setting collection to use manual sort order to preserve our ordering...")
+                update_response = self.session.post(collection_update_url, json=update_data, timeout=30)
+                
+                if update_response.status_code in [200, 204]:
+                    print(f"Successfully set manual sort order for collection")
+                else:
+                    print(f"Warning: Failed to set manual sort order for collection: {update_response.status_code}")
+                    if update_response.text:
+                        print(f"Response: {update_response.text[:200]}")
+                
                 return True
             else:
                 print(f"Failed to add items to collection: {response.status_code}")
