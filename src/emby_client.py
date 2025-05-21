@@ -315,7 +315,7 @@ class EmbyClient(MediaServerClient):
                 logger.info(f"Successfully set items in collection {collection_id}.")
 
                 # 2. Set and VERIFY the Collection's DisplayOrder to "SortName"
-                logger.info(f"Attempting to set collection {collection_id} DisplayOrder to ProductionYear (SortOrder: Descending)...")
+                logger.info(f"Attempting to set collection {collection_id} DisplayOrder to PremiereDate (SortOrder: Descending)...")
                 
                 # Initialize update_response to None to track if we attempted the update
                 update_response = None
@@ -332,19 +332,18 @@ class EmbyClient(MediaServerClient):
                     # Start with all existing data and modify what we need
                     collection_metadata_payload = collection_data.copy()
                     
-                    # Set the DisplayOrder to ProductionYear in descending order
-                    # Make sure all relevant fields are included and formatted correctly
-                    collection_metadata_payload["DisplayOrder"] = "ProductionYear"
+                    # Set the DisplayOrder to PremiereDate in descending order
+                    collection_metadata_payload["DisplayOrder"] = "PremiereDate"
                     collection_metadata_payload["SortOrder"] = "Descending"
+                    collection_metadata_payload["SortBy"] = "PremiereDate"
                     
-                    # Ensure other sorting-related fields are properly set
-                    collection_metadata_payload["SortBy"] = "ProductionYear"
-                    collection_metadata_payload["SortByPremiereDate"] = False
+                    # These might be redundant if SortBy is PremiereDate, but set for clarity or older Emby versions
+                    collection_metadata_payload["SortByPremiereDate"] = False 
                     collection_metadata_payload["SortByPremiereFirst"] = False
                     
-                    # Ensure LockedFields allows DisplayOrder to be changed
+                    # Ensure LockedFields allows DisplayOrder and SortBy to be changed
                     locked_fields = collection_metadata_payload.get('LockedFields') if isinstance(collection_metadata_payload.get('LockedFields'), list) else []
-                    locked_fields = [field for field in locked_fields if field != 'DisplayOrder']
+                    locked_fields = [field for field in locked_fields if field not in ['DisplayOrder', 'SortBy']]
                     collection_metadata_payload['LockedFields'] = locked_fields
                     
                     # Send the update to the collection
@@ -355,7 +354,7 @@ class EmbyClient(MediaServerClient):
                 
                 # Only perform verification if we attempted the update
                 if display_order_update_attempted and update_response and update_response.status_code in [200, 204]:
-                    logger.info(f"Attempt to set collection DisplayOrder to ProductionYear (SortOrder: Descending) successful (HTTP {update_response.status_code}). Verifying...")
+                    logger.info(f"Attempt to set collection DisplayOrder to PremiereDate (SortOrder: Descending) successful (HTTP {update_response.status_code}). Verifying...")
                     
                     # *** IMMEDIATE VERIFICATION ***
                     verification_url = f"{self.server_url}/Users/{self.user_id}/Items/{collection_id}?api_key={self.api_key}&Fields=DisplayOrder,SortOrder,Name"
@@ -365,8 +364,8 @@ class EmbyClient(MediaServerClient):
                         actual_display_order = verify_data['DisplayOrder']
                         actual_sort_order = verify_data.get('SortOrder', 'Unknown')
                         logger.info(f"VERIFIED: Collection '{verify_data.get('Name')}' (ID: {collection_id}) is using sorting by {actual_display_order} in {actual_sort_order} order")
-                        if actual_display_order != "ProductionYear" or actual_sort_order != "Descending":
-                            logger.critical(f"CRITICAL: Collection sort settings did NOT apply! Expected 'ProductionYear/Descending', got '{actual_display_order}/{actual_sort_order}'. Year-based sorting may not work correctly.")
+                        if actual_display_order != "PremiereDate" or actual_sort_order != "Descending":
+                            logger.critical(f"CRITICAL: Collection sort settings did NOT apply! Expected 'PremiereDate/Descending', got '{actual_display_order}/{actual_sort_order}'. This may affect collection sorting.")
                     else:
                         logger.warning(f"Could not verify collection DisplayOrder. Response: {verify_data}")
                 elif display_order_update_attempted and update_response:
