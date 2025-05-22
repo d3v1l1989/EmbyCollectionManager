@@ -82,6 +82,29 @@ class TmdbClient:
         except requests.RequestException as e:
             self.logger.error(f"TMDb get_tmdb_series_collection_details failed: {e}")
             return None
+            
+    def get_collection_images(self, collection_id):
+        """
+        Fetch images specifically for a TMDb collection.
+        
+        Args:
+            collection_id: TMDb collection ID
+            
+        Returns:
+            Dictionary containing images data with 'backdrops' and 'posters' lists,
+            or None if there was an error
+        """
+        url = f"{self.BASE_URL}/collection/{collection_id}/images"
+        try:
+            # For collections, language should be set to 'en' or null to get all images
+            # The 'en-US' sometimes doesn't work for collections
+            resp = self.session.get(url, params={"api_key": self.api_key, "language": "en"}, timeout=10)
+            resp.raise_for_status()
+            self.logger.info(f"Successfully fetched images for TMDb collection {collection_id}")
+            return resp.json()
+        except requests.RequestException as e:
+            self.logger.error(f"TMDb get_collection_images failed: {e}")
+            return None
 
     def get_movie_details(self, movie_id):
         """

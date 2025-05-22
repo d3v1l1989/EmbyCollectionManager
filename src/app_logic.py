@@ -142,27 +142,72 @@ def main():
                 collection_id = _sync_collection(emby, collection_name, tmdb_ids)
 
                 if collection_id: # Proceed only if collection sync was successful
-                    # --- BEGIN NEW LOGIC TO FETCH ARTWORK URLS ---
-                    if tmdb_ids: # If there are movies in the collection
+                    # --- BEGIN IMPROVED ARTWORK FETCHING LOGIC ---
+                    # Determine if this is a TMDB collection or discover-based collection
+                    if source_type == 'tmdb_series_collection' and 'tmdb_collection_id' in recipe:
+                        # For TMDB collections, fetch proper collection artwork
+                        tmdb_collection_id = recipe['tmdb_collection_id']
+                        logger.info(f"Fetching dedicated collection artwork for TMDb collection ID {tmdb_collection_id}")
+                        
+                        # Get collection details first (includes basic artwork)
+                        collection_details = tmdb.get_tmdb_series_collection_details(tmdb_collection_id)
+                        if collection_details:
+                            # Try to get basic poster/backdrop from collection details
+                            if collection_details.get('poster_path'):
+                                poster_url = tmdb.get_image_url(collection_details['poster_path'])
+                                logger.info(f"Found collection poster for '{collection_name}': {poster_url}")
+                            if collection_details.get('backdrop_path'):
+                                backdrop_url = tmdb.get_image_url(collection_details['backdrop_path'])
+                                logger.info(f"Found collection backdrop for '{collection_name}': {backdrop_url}")
+                                
+                            # If still no poster, try the dedicated images endpoint for more options
+                            if not poster_url or not backdrop_url:
+                                collection_images = tmdb.get_collection_images(tmdb_collection_id)
+                                if collection_images:
+                                    if not poster_url and collection_images.get('posters') and len(collection_images['posters']) > 0:
+                                        # Get highest voted poster
+                                        sorted_posters = sorted(collection_images['posters'], 
+                                                             key=lambda x: x.get('vote_average', 0), reverse=True)
+                                        poster_path = sorted_posters[0].get('file_path')
+                                        if poster_path:
+                                            poster_url = tmdb.get_image_url(poster_path)
+                                            logger.info(f"Found collection poster from images API for '{collection_name}': {poster_url}")
+                                    
+                                    if not backdrop_url and collection_images.get('backdrops') and len(collection_images['backdrops']) > 0:
+                                        # Get highest voted backdrop
+                                        sorted_backdrops = sorted(collection_images['backdrops'], 
+                                                               key=lambda x: x.get('vote_average', 0), reverse=True)
+                                        backdrop_path = sorted_backdrops[0].get('file_path')
+                                        if backdrop_path:
+                                            backdrop_url = tmdb.get_image_url(backdrop_path)
+                                            logger.info(f"Found collection backdrop from images API for '{collection_name}': {backdrop_url}")
+                        else:
+                            logger.warning(f"Could not fetch collection details for TMDb collection ID {tmdb_collection_id}")
+                    
+                    # For other collection types or as fallback, use the first movie's artwork
+                    if (not poster_url or not backdrop_url) and tmdb_ids:
                         try:
+                            logger.info(f"Falling back to movie artwork for collection '{collection_name}'")
                             # Fetch details for the first movie to use its artwork
                             representative_movie_id = tmdb_ids[0]
                             logger.debug(f"Fetching details for movie ID {representative_movie_id} to get artwork for collection '{collection_name}'.")
                             movie_details = tmdb.get_movie_details(representative_movie_id)
                             if movie_details:
-                                if movie_details.get('poster_path'):
+                                if not poster_url and movie_details.get('poster_path'):
                                     poster_url = tmdb.get_image_url(movie_details['poster_path'])
                                     logger.info(f"Using poster from movie ID {representative_movie_id} for collection '{collection_name}': {poster_url}")
-                                if movie_details.get('backdrop_path'):
+                                if not backdrop_url and movie_details.get('backdrop_path'):
                                     backdrop_url = tmdb.get_image_url(movie_details['backdrop_path'])
                                     logger.info(f"Using backdrop from movie ID {representative_movie_id} for collection '{collection_name}': {backdrop_url}")
                             else:
                                 logger.warning(f"Could not fetch details for movie ID {representative_movie_id} to get artwork for collection '{collection_name}'.")
                         except Exception as e_art:
-                            logger.error(f"Error fetching artwork details for collection '{collection_name}': {e_art}")
-                    else:
+                            logger.error(f"Error fetching movie artwork for collection '{collection_name}': {e_art}")
+                    elif not tmdb_ids:
                         logger.info(f"No movies in collection '{collection_name}', skipping artwork update attempt.")
-                    # --- END NEW LOGIC ---
+                    else:
+                        logger.info(f"Successfully found collection artwork for '{collection_name}'")
+                    # --- END IMPROVED ARTWORK FETCHING LOGIC ---
 
                     if poster_url or backdrop_url: # Condition now checks the fetched URLs
                         logger.info(f"Attempting to update artwork for Emby collection '{collection_name}' (ID: {collection_id})")
