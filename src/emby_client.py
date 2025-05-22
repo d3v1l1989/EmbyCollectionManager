@@ -401,13 +401,12 @@ class EmbyClient(MediaServerClient):
             return False
 
     # Removed methods related to custom sorting since we're now using year-based sorting
-    # - set_collection_display_order is handled by updating DisplayOrder on the collection item
-    # - set_collection_items_sort_order is no longer needed
-    # - _set_item_sort_names has been removed as we're using ProductionYear sorting
-        
+    
     def update_collection_artwork(self, collection_id: str, poster_url: Optional[str]=None, backdrop_url: Optional[str]=None) -> bool:
         """
         Update artwork for an Emby collection using external image URLs.
+        First tries to fetch collection poster from TMDb if not provided, and only falls back to 
+        first movie's poster if no collection poster is available.
         
         Args:
             collection_id: The Emby collection ID
@@ -429,8 +428,82 @@ class EmbyClient(MediaServerClient):
         
         if not collection_id:
             return False
-            
-        # Update poster if provided
+        
+        # If no poster_url is provided, try to fetch collection images directly from TMDb
+        if not poster_url:
+            logger.info(f"No poster URL provided, attempting to fetch collection images from TMDb")
+            try:
+                # First, get the collection details to find the TMDb collection ID
+                collection_endpoint = f"/Items/{collection_id}?api_key={self.api_key}"
+                collection_data = self._make_api_request('GET', collection_endpoint)
+                
+                if collection_data and 'ProviderIds' in collection_data:
+                    tmdb_id = collection_data['ProviderIds'].get('Tmdb')
+                    
+                    if tmdb_id:
+                        logger.info(f"Found TMDb collection ID: {tmdb_id}")
+                        # Use remote images endpoint to get available images for the collection
+                        remote_images_endpoint = f"/Items/{collection_id}/RemoteImages?api_key={self.api_key}"
+                        remote_images_data = self._make_api_request('GET', remote_images_endpoint)
+                        
+                        # Look for collection poster in remote images
+                        if remote_images_data and 'Images' in remote_images_data:
+                            collection_posters = [img for img in remote_images_data['Images'] 
+                                                if img.get('Type') == 'Primary' and 
+                                                img.get('ProviderName') == 'TheMovieDb']
+                            
+                            if collection_posters:
+                                # Sort by vote average to get the best poster
+                                collection_posters.sort(key=lambda x: x.get('CommunityRating', 0), reverse=True)
+                                poster_url = collection_posters[0].get('Url')
+                                logger.info(f"Found collection poster from TMDb: {poster_url}")
+                            else:
+                                logger.info("No collection poster found in TMDb remote images")
+                        else:
+                            logger.info("No remote images data available for collection")
+                    else:
+                        logger.info("No TMDb ID found for collection")
+                else:
+                    logger.info("Could not retrieve collection data or no provider IDs available")
+                    
+                # If we still don't have a poster URL, try to get poster from the first movie in the collection
+                if not poster_url:
+                    logger.info("Falling back to first movie poster in the collection")
+                    # Get items in the collection
+                    collection_items_endpoint = f"/Items?ParentId={collection_id}&api_key={self.api_key}"
+                    items_data = self._make_api_request('GET', collection_items_endpoint)
+                    
+                    if items_data and 'Items' in items_data and items_data['Items']:
+                        first_item = items_data['Items'][0]
+                        first_item_id = first_item.get('Id')
+                        
+                        if first_item_id:
+                            # Get remote images for the first item
+                            item_images_endpoint = f"/Items/{first_item_id}/RemoteImages?api_key={self.api_key}"
+                            item_images_data = self._make_api_request('GET', item_images_endpoint)
+                            
+                            if item_images_data and 'Images' in item_images_data:
+                                movie_posters = [img for img in item_images_data['Images'] 
+                                                if img.get('Type') == 'Primary' and 
+                                                img.get('ProviderName') == 'TheMovieDb']
+                                
+                                if movie_posters:
+                                    # Sort by vote average to get the best poster
+                                    movie_posters.sort(key=lambda x: x.get('CommunityRating', 0), reverse=True)
+                                    poster_url = movie_posters[0].get('Url')
+                                    logger.info(f"Using first movie's poster as fallback: {poster_url}")
+                                else:
+                                    logger.info("No movie poster found in TMDb remote images for first item")
+                            else:
+                                logger.info("No remote images data available for first item")
+                        else:
+                            logger.info("Could not get ID for the first item in collection")
+                    else:
+                        logger.info("No items found in collection")
+            except Exception as e:
+                logger.error(f"Error trying to fetch collection/movie poster: {e}")
+        
+        # Update poster if available
         if poster_url:
             logger.info(f"Attempting to set poster for {collection_id} with URL: {poster_url}")
             try:
