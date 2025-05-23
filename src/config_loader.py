@@ -1,12 +1,9 @@
 import os
 import yaml
-from dotenv import load_dotenv
 
 class ConfigLoader:
-    def __init__(self, yaml_path=None, dotenv_path=None):
+    def __init__(self, yaml_path=None):
         self.config = {}
-        if dotenv_path:
-            load_dotenv(dotenv_path)
         if yaml_path and os.path.exists(yaml_path):
             with open(yaml_path, 'r', encoding='utf-8') as f:
                 self.config = yaml.safe_load(f)

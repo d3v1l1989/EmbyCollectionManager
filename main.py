@@ -25,17 +25,17 @@ def main():
     while True:
         try:
             # Load configuration each run to pick up any changes
-            config = ConfigLoader(yaml_path="config/config.yaml", dotenv_path=".env")
+            config = ConfigLoader(yaml_path="config/config.yaml")
             tmdb_api_key = config.get("TMDB_API_KEY")
             
             if tmdb_api_key and tmdb_api_key != "YOUR_TMDB_API_KEY":
                 logger.info(f"TMDb API key loaded: {tmdb_api_key[:4]}... (hidden)")
             else:
-                logger.error("TMDb API key not set. Please update config/config.yaml or your .env file.")
+                logger.error("TMDb API key not set. Please update config/config.yaml.")
                 sys.exit(1)
                 
-            # Get the SYNC_TARGET from environment
-            sync_target = os.getenv('SYNC_TARGET', 'auto')
+            # Get the SYNC_TARGET from config or environment
+            sync_target = config.get('SYNC_TARGET', 'auto')
             logger.info(f"Using sync target: {sync_target}")
             
             # Run the main application logic with the sync target

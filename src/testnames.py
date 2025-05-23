@@ -10,12 +10,8 @@ from typing import List, Dict, Any, Optional
 import requests
 import argparse
 
-# Make dotenv optional
-try:
-    from dotenv import load_dotenv
-    has_dotenv = True
-except ImportError:
-    has_dotenv = False
+# Import ConfigLoader
+from src.config_loader import ConfigLoader
 
 # Configure logging
 logging.basicConfig(
@@ -128,31 +124,24 @@ def main():
     parser.add_argument("--limit", "-l", dest="limit", type=int, default=5,
                         help="Number of items to check (default: 5)")
     parser.add_argument("--server", "-s", dest="server_url", 
-                        help="Emby server URL (default: from .env)")
+                        help="Emby server URL (default: from config.yaml)")
     parser.add_argument("--apikey", "-a", dest="api_key",
-                        help="Emby API key (default: from .env)")
+                        help="Emby API key (default: from config.yaml)")
     parser.add_argument("--userid", "-u", dest="user_id",
-                        help="Emby user ID (default: from .env)")
+                        help="Emby user ID (default: from config.yaml)")
     
     args = parser.parse_args()
     
-    # Load .env file if the dotenv package is available
-    if has_dotenv:
-        try:
-            load_dotenv()
-        except Exception as e:
-            logger.warning(f"Error loading .env file: {e}")
-    elif not (args.server_url and args.api_key and args.user_id):
-        logger.warning("python-dotenv package not installed. Using command line or environment variables only.")
-        logger.warning("Install with: pip install python-dotenv if you want to use .env files")
+    # Load config.yaml
+    config = ConfigLoader(yaml_path="config/config.yaml")
     
-    # Get credentials from environment or command line
-    server_url = args.server_url or os.getenv("EMBY_SERVER_URL")
-    api_key = args.api_key or os.getenv("EMBY_API_KEY")
-    user_id = args.user_id or os.getenv("EMBY_USER_ID")
+    # Get credentials from config.yaml or command line
+    server_url = args.server_url or config.get("EMBY_URL")
+    api_key = args.api_key or config.get("EMBY_API_KEY")
+    user_id = args.user_id or config.get("EMBY_USER_ID")
     
     if not server_url or not api_key or not user_id:
-        logger.error("Missing credentials. Please set EMBY_SERVER_URL, EMBY_API_KEY, and EMBY_USER_ID in .env file or provide via command line")
+        logger.error("Missing credentials. Please set EMBY_URL, EMBY_API_KEY, and EMBY_USER_ID in config/config.yaml file or provide via command line")
         sys.exit(1)
     
     check_sort_names(server_url, api_key, user_id, args.collection_id, args.limit)

@@ -1,7 +1,26 @@
 __pycache__/
-.env
 config/config.yaml
 *.pyc
+
+# Test files
+tests/
+*_test.py
+test_*.py
+
+# Recipe generators and files (except collection_recipes.py)
+src/recipe_generators/
+recipes/
+*_recipes.py
+!src/collection_recipes.py
+
+# Check duplicates feature
+check_duplicates.py
+src/check_duplicates.py
+
+# Planning and task files
 PLANNING.md
 TASK.md
-src/generate_*recipes*.py
+
+# Merge collections
+merge_collections.py
+src/merge_collections.py

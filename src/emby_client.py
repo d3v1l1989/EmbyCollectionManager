@@ -2,8 +2,12 @@ from typing import List, Optional, Dict, Any
 import uuid
 import logging
 import requests
+import os
+from typing import List, Dict, Any, Optional
 from urllib.parse import quote
+
 from .base_media_server_client import MediaServerClient
+from .poster_generator import generate_custom_poster, file_to_url
 
 logger = logging.getLogger(__name__)
 
@@ -502,6 +506,49 @@ class EmbyClient(MediaServerClient):
                         logger.info("No items found in collection")
             except Exception as e:
                 logger.error(f"Error trying to fetch collection/movie poster: {e}")
+        
+        # If still no poster URL found, try generating a custom poster if enabled in config
+        if not poster_url and hasattr(self, 'config') and self.config.get('poster_settings', {}).get('enable_custom_posters', True):
+            # Get collection name from collection data
+            collection_name = None
+            try:
+                if not collection_data or 'Name' not in collection_data:
+                    # Try to fetch collection details if we don't have them yet
+                    collection_endpoint = f"/Items/{collection_id}?api_key={self.api_key}"
+                    collection_data = self._make_api_request('GET', collection_endpoint)
+                
+                if collection_data and 'Name' in collection_data:
+                    collection_name = collection_data['Name']
+                    
+                    # Get poster settings from config
+                    poster_settings = self.config.get('poster_settings', {})
+                    template_name = poster_settings.get('template_name')
+                    text_color = poster_settings.get('text_color')
+                    bg_color = poster_settings.get('bg_color')
+                    text_position = poster_settings.get('text_position')
+                    
+                    # Generate custom poster with configured settings
+                    logger.info(f"Attempting to generate custom poster for collection '{collection_name}'")
+                    custom_poster_path = generate_custom_poster(
+                        collection_name,
+                        template_name=template_name,
+                        text_color=text_color,
+                        bg_color=bg_color,
+                        text_position=text_position
+                    )
+                    
+                    if custom_poster_path:
+                        # Convert file path to URL
+                        poster_url = file_to_url(custom_poster_path)
+                        logger.info(f"Generated custom poster at: {custom_poster_path}")
+                    else:
+                        logger.warning(f"Failed to generate custom poster for '{collection_name}'")
+                else:
+                    logger.warning("Could not determine collection name for custom poster generation")
+            except Exception as e:
+                logger.error(f"Error generating custom poster: {e}")
+        elif not poster_url:
+            logger.info("Custom poster generation is disabled in config or config not available.")
         
         # Update poster if available
         if poster_url:

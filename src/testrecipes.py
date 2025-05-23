@@ -1,320 +1,29 @@
 from typing import List, Dict, Any
 
-# This file contains categorized collection recipes for the TMDbCollector application
-# Recipes are organized by category for easier maintenance and readability
-
-COLLECTION_RECIPES: List[Dict[str, Any]] = [
-    #############################################
-    # SECTION 1: TMDb GENERAL COLLECTIONS
-    #############################################
-    {
-        "name": "Popular Movies on TMDb",
-        "source_type": "tmdb_discover_individual_movies",
-        "tmdb_discover_params": {'sort_by': 'popularity.desc', 'vote_count.gte': 100},
-        "item_limit": 40,
-        "target_servers": ['emby']
-    },
-    {
-        "name": "Top Rated Movies on TMDb",
-        "source_type": "tmdb_discover_individual_movies",
-        "tmdb_discover_params": {'sort_by': 'vote_average.desc', 'vote_count.gte': 500},
-        "item_limit": 40,
-        "target_servers": ['emby']
-    },
-    {
-        "name": "New Releases (Last Year)",
-        "source_type": "tmdb_discover_individual_movies",
-        "tmdb_discover_params": {'sort_by': 'release_date.desc', 'primary_release_date.gte': '2024-01-01', 'vote_count.gte': 50},
-        "item_limit": 30,
-        "target_servers": ['emby']
-    },
-
-    {'name': 'Audience Favorites', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'vote_average.desc', 'vote_count.gte': 1000, 'vote_average.gte': 8}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Recent Box Office Hits', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'revenue.desc', 'primary_release_date.gte': '2024-01-01'}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Hidden Gems', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'vote_average.desc', 'vote_count.gte': 100, 'vote_count.lte': 500, 'vote_average.gte': 7.5}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Blockbusters of All Time', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'revenue.desc', 'vote_count.gte': 500}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Recent Indie Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'popularity.desc', 'primary_release_date.gte': '2023-01-01', 'vote_average.gte': 6, 'with_companies': '194'}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Foreign Language Hits', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'vote_average.desc', 'vote_count.gte': 300, 'with_original_language': 'ko,fr,es,de,ja', 'vote_average.gte': 7}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Top Animated Features', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'vote_average.desc', 'vote_count.gte': 300, 'with_genres': '16', 'vote_average.gte': 7}, 'item_limit': 30, 'target_servers': ['emby']},
-    
-    #############################################
-    # CATEGORY 2: STREAMING PLATFORM COLLECTIONS
-    #############################################
-    # Netflix Collections
-    {'name': 'Popular on Netflix', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '8', 'watch_region': 'US', 'sort_by': 'popularity.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Top Rated on Netflix', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '8', 'watch_region': 'US', 'sort_by': 'vote_average.desc', 'vote_count.gte': 200}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Netflix Originals', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '213', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    
-    # Disney+ Collections
-    {'name': 'Popular on Disney+', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '337', 'watch_region': 'US', 'sort_by': 'popularity.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Top Rated on Disney+', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '337', 'watch_region': 'US', 'sort_by': 'vote_average.desc', 'vote_count.gte': 200}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Disney+ Originals', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '2', 'with_watch_providers': '337', 'watch_region': 'US', 'sort_by': 'popularity.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-    
-    # Amazon Prime Video Collections
-    {'name': 'Popular on Amazon Prime', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '9', 'watch_region': 'US', 'sort_by': 'popularity.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Top Rated on Amazon Prime', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '9', 'watch_region': 'US', 'sort_by': 'vote_average.desc', 'vote_count.gte': 200}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Amazon Prime Originals', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '20580', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    
-    # HBO Max Collections
-    {'name': 'Popular on HBO Max', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '384', 'watch_region': 'US', 'sort_by': 'popularity.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Top Rated on HBO Max', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '384', 'watch_region': 'US', 'sort_by': 'vote_average.desc', 'vote_count.gte': 200}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'HBO Max Originals', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '174', 'with_watch_providers': '384', 'watch_region': 'US', 'sort_by': 'popularity.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-    
-    # Apple TV+ Collections
-    {'name': 'Popular on Apple TV+', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '350', 'watch_region': 'US', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Top Rated on Apple TV+', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '350', 'watch_region': 'US', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Apple TV+ Originals', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '152952', 'sort_by': 'popularity.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-    
-    # Hulu Collections
-    {'name': 'Popular on Hulu', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '15', 'watch_region': 'US', 'sort_by': 'popularity.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Top Rated on Hulu', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '15', 'watch_region': 'US', 'sort_by': 'vote_average.desc', 'vote_count.gte': 200}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Hulu Originals', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '3364', 'sort_by': 'popularity.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-    
-    # Paramount+ Collections
-    {'name': 'Popular on Paramount+', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '531', 'watch_region': 'US', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Top Rated on Paramount+', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '531', 'watch_region': 'US', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Paramount+ Originals', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '4', 'with_watch_providers': '531', 'watch_region': 'US', 'sort_by': 'popularity.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-    
-    # Peacock Collections
-    {'name': 'Popular on Peacock', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '386', 'watch_region': 'US', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Top Rated on Peacock', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '386', 'watch_region': 'US', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Peacock Originals', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '33', 'with_watch_providers': '386', 'watch_region': 'US', 'sort_by': 'popularity.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-    
-    # Crunchyroll Collections
-    {'name': 'Popular on Crunchyroll', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '283', 'watch_region': 'US', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Top Rated on Crunchyroll', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '283', 'watch_region': 'US', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Anime Movies on Crunchyroll', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '283', 'watch_region': 'US', 'with_genres': '16', 'sort_by': 'popularity.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-    
-    # Discovery+ Collections
-    {'name': 'Popular on Discovery+', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '520', 'watch_region': 'US', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Documentaries on Discovery+', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '520', 'watch_region': 'US', 'with_genres': '99', 'sort_by': 'popularity.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-    
-    # Shudder Collections
-    {'name': 'Popular on Shudder', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '99', 'watch_region': 'US', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Horror Movies on Shudder', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '99', 'watch_region': 'US', 'with_genres': '27', 'sort_by': 'popularity.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-    
-    #############################################
-    # CATEGORY 3: FRANCHISE COLLECTIONS
-    #############################################
-    {
-        "name": "Star Wars Collection",
-        "source_type": "tmdb_series_collection",
-        "tmdb_collection_id": 10,
-        "target_servers": ['emby'],
-        "sort_by": "title"
-    },
-    {
-        "name": "James Bond Collection",
-        "source_type": "tmdb_series_collection",
-        "tmdb_collection_id": 645,
-        "target_servers": ['emby'],
-        "sort_by": "release_date"
-    },
-    {
-        "name": "Harry Potter Collection",
-        "source_type": "tmdb_series_collection",
-        "tmdb_collection_id": 1241,
-        "target_servers": ['emby'],
-        "sort_by": "release_date"
-    },
-    {
-        "name": "Marvel Cinematic Universe Collection",
-        "source_type": "tmdb_series_collection",
-        "tmdb_collection_id": 86311,
-        "target_servers": ['emby'],
-        "sort_by": "release_date"
-    },
-    {
-        "name": "Fast & Furious Collection",
-        "source_type": "tmdb_series_collection",
-        "tmdb_collection_id": 9485,
-        "target_servers": ['emby'],
-        "sort_by": "release_date"
-    },
-
-        {'name': 'The Lord of the Rings Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 119, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Hobbit Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 121938, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Jurassic Park Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 328, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Matrix Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2344, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Terminator Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 528, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Alien Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 8091, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Pirates of the Caribbean Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 295, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Hunger Games Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 131635, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Transformers Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 8650, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Die Hard Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1570, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Mission: Impossible Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 87359, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Toy Story Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 10194, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Godfather Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 230, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Rocky Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1575, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Blade Runner Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 422837, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Dark Knight Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 263, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Ghostbusters Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2980, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Ice Age Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 8354, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Kung Fu Panda Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 77816, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Mummy Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1733, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Ocean\'s Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 304, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Planet of the Apes (Original) Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 19995, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Predator Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 399, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Men in Black Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 86055, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Conjuring Universe', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 313086, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Avengers Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 86311, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Guardians of the Galaxy Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 284433, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Captain America Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 131292, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Iron Man Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 131294, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Incredibles Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 468222, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Finding Nemo Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 137697, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Lion King Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 94032, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Monsters, Inc. Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 137696, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Cars Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 87118, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Hangover Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 86033, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Madagascar Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 18652, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'How to Train Your Dragon Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 89137, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Bourne Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 31562, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Night at the Museum Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 85299, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Twilight Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 33514, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Princess Diaries Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 107674, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Austin Powers Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1006, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Expendables Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 126125, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Saw Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 656, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Final Destination Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 8864, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Underworld Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2326, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Resident Evil Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 17255, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Chronicles of Narnia Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 420, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Insidious Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 238163, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'John Wick Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 404609, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Pokémon Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 34055, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Back to the Future Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 264, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Grumpy Old Men Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 119050, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Planet of the Apes (Reboot) Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 173710, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Scary Movie Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 4246, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Tomb Raider Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2467, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Scream Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2602, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Rambo Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 5039, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Despicable Me Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 86066, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Fantastic Beasts Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 435259, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Indiana Jones Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 84, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': "Child's Play Collection", 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 10455, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Thor Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 131296, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Halloween Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 91361, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Shrek Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2150, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'X-Men Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 748, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'American Pie Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2806, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Star Trek: Alternate Reality Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 115575, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Moana Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1241984, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Karate Kid Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 8580, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Fast and the Furious Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 9485, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Hannibal Lecter Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 9743, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Lion King (Reboot) Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 762512, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Devara Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1187990, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Bullet Train Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1471524, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Spider-Man (MCU) Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 531241, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Spider-Man Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 556, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Quintessential Quintuplets Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1287339, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'xXx Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 52785, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Ip Man Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 70068, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Avatar Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 87096, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Fault Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1156666, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Legend of Hei Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1444577, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'O Auto da Compadecida: Coleção', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1219938, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Wild Robot Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1370345, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Twilight Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 33514, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': "Gabriel's Inferno Collection", 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 729322, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Sonic the Hedgehog Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 720879, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Mad Max Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 8945, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Psycho Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 119674, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Spider-Man: Spider-Verse Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 573436, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Conjuring Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 313086, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'Lost Bullet Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1002775, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-    {'name': 'The Minecraft Movie Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1461530, 'target_servers': ['emby'], 'sort_by': 'release_date'},
-
-    #############################################
-    # CATEGORY 4: GENRE COLLECTIONS
-    #############################################
-    {
-        "item_limit": 30,
-        "name": "Adventure Movies",
-        "source_type": "tmdb_discover_individual_movies",
-        "target_servers": ['emby'],
-        "tmdb_discover_params": {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '12'}
-    },
-    {
-        "item_limit": 30,
-        "name": "Animation Movies",
-        "source_type": "tmdb_discover_individual_movies",
-        "target_servers": ['emby'],
-        "tmdb_discover_params": {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '16'}
-    },
-    {
-        "item_limit": 30,
-        "name": "Crime Movies",
-        "source_type": "tmdb_discover_individual_movies",
-        "target_servers": ['emby'],
-        "tmdb_discover_params": {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '80'}
-    },
-    {
-        "item_limit": 30,
-        "name": "Documentary Movies",
-        "source_type": "tmdb_discover_individual_movies",
-        "target_servers": ['emby'],
-        "tmdb_discover_params": {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '99'}
-    },
-    {
-        "item_limit": 30,
-        "name": "Drama Movies",
-        "source_type": "tmdb_discover_individual_movies",
-        "target_servers": ['emby'],
-        "tmdb_discover_params": {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '18'}
-    },
-    {
-        "item_limit": 30,
-        "name": "Family Movies",
-        "source_type": "tmdb_discover_individual_movies",
-        "target_servers": ['emby'],
-        "tmdb_discover_params": {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '10751'}
-    },
-    {
-        "item_limit": 30,
-        "name": "Fantasy Movies",
-        "source_type": "tmdb_discover_individual_movies",
-        "target_servers": ['emby'],
-        "tmdb_discover_params": {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '14'}
-    },
-    {
-        "item_limit": 30,
-        "name": "History Movies",
-        "source_type": "tmdb_discover_individual_movies",
-        "target_servers": ['emby'],
-        "tmdb_discover_params": {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '36'}
-    },
-    {
-        "item_limit": 30,
-        "name": "Horror Movies",
-        "source_type": "tmdb_discover_individual_movies",
-        "target_servers": ['emby'],
-        "tmdb_discover_params": {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '27'}
-    },
-    {
-        "item_limit": 30,
-        "name": "Music Movies",
-        "source_type": "tmdb_discover_individual_movies",
-        "target_servers": ['emby'],
-        "tmdb_discover_params": {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '10402'}
-    },
-    {
-        "item_limit": 30,
-        "name": "Mystery Movies",
-        "source_type": "tmdb_discover_individual_movies",
-        "target_servers": ['emby'],
-        "tmdb_discover_params": {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '9648'}
-    },
-    {
-        "item_limit": 30,
-        "name": "Romance Movies",
-        "source_type": "tmdb_discover_individual_movies",
-        "target_servers": ['emby'],
-        "tmdb_discover_params": {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '10749'}
-    },
-
+# Auto-generated mega collection recipes
+MEGA_COLLECTION_RECIPES: List[Dict[str, Any]] = [
+    {'name': 'Action Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '28', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Adventure Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '12', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Animation Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '16', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Comedy Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '35', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Crime Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '80', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Documentary Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '99', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Drama Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '18', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Family Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '10751', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Fantasy Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '14', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'History Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '36', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Horror Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '27', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Music Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '10402', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Mystery Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '9648', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Romance Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '10749', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Science Fiction Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '878', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'TV Movie Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '10770', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Thriller Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '53', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'War Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '10752', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Western Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '37', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Action & Adventure Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '28,12', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Action & Science Fiction Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '28,878', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Adventure & Fantasy Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '12,14', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Drama & Romance Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '18,10749', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Comedy & Romance Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '35,10749', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Crime & Thriller Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '80,53', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
@@ -330,22 +39,9 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'Adventure & Comedy Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '12,35', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Adventure & Drama Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '12,18', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Adventure & Science Fiction Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '12,878', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Action & Adventure Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '28,12', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Action & Science Fiction Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '28,878', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Adventure & Horror Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '12,27', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Adventure & Thriller Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '12,53', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Adventure & Fantasy Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '12,14', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'item_limit': 30, 'name': 'Science Fiction Movies', 'source_type': 'tmdb_discover_individual_movies', 'target_servers': ['emby'], 'tmdb_discover_params': {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '878'}},
-    {'item_limit': 30, 'name': 'Thriller Movies', 'source_type': 'tmdb_discover_individual_movies', 'target_servers': ['emby'], 'tmdb_discover_params': {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '53'}},
-    {'item_limit': 30, 'name': 'War Movies', 'source_type': 'tmdb_discover_individual_movies', 'target_servers': ['emby'], 'tmdb_discover_params': {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '10752'}},
-    {'item_limit': 30, 'name': 'Western Movies', 'source_type': 'tmdb_discover_individual_movies', 'target_servers': ['emby'], 'tmdb_discover_params': {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '37'}},
-    {'name': 'Action Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '28', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Comedy Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '35', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
-    
-    
-    #############################################
-    # CATEGORY 5: DIRECTOR COLLECTIONS
-    #############################################
+    {'name': 'Steven Spielberg Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '488', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Christopher Nolan Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '525', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Martin Scorsese Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '1032', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Quentin Tarantino Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '138', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
@@ -367,21 +63,6 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'Ethan Coen Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '1224', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Clint Eastwood Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '190', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Ang Lee Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '1614', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
-    
-    #############################################
-    # CATEGORY 6: ACTOR COLLECTIONS
-    #############################################
-    {'name': 'Jennifer Lawrence Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '72129', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
-    {'name': 'Brad Pitt Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '287', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
-    {'name': 'Scarlett Johansson Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '1245', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
-    {'name': 'Robert Downey Jr. Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '3223', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
-    {'name': 'Tom Cruise Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '500', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
-    {'name': 'Viola Davis Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '19492', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
-    {'name': 'Cate Blanchett Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '112', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
-    {'name': 'Morgan Freeman Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '192', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
-    {'name': 'Emma Stone Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '54693', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
-    {'name': 'Samuel L. Jackson Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '2231', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
-    {'name': 'Anthony Hopkins Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '4173', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
     {'name': 'Ron Howard Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '6159', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Alfonso Cuarón Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '11218', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Darren Aronofsky Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '6431', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
@@ -405,6 +86,21 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'Bong Joon-ho Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '21684', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Andrei Tarkovsky Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '8452', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Sergio Leone Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '4385', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'Tom Hanks Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '31', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
+    {'name': 'Leonardo DiCaprio Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '6193', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
+    {'name': 'Meryl Streep Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '5064', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
+    {'name': 'Denzel Washington Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '5292', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
+    {'name': 'Jennifer Lawrence Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '72129', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
+    {'name': 'Brad Pitt Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '287', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
+    {'name': 'Scarlett Johansson Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '1245', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
+    {'name': 'Robert Downey Jr. Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '3223', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
+    {'name': 'Tom Cruise Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '500', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
+    {'name': 'Viola Davis Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '19492', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
+    {'name': 'Cate Blanchett Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '112', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
+    {'name': 'Morgan Freeman Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '192', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
+    {'name': 'Emma Stone Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '54693', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
+    {'name': 'Samuel L. Jackson Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '2231', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
+    {'name': 'Anthony Hopkins Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '4173', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
     {'name': 'Christian Bale Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '3894', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
     {'name': 'Joaquin Phoenix Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '73421', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
     {'name': 'Ryan Gosling Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '30614', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
@@ -440,10 +136,6 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'Mahershala Ali Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '932967', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
     {'name': 'Michelle Yeoh Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '1620', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
     {'name': "Lupita Nyong'o Movies", 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '1267329', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
-    
-    #############################################
-    # CATEGORY 7: DECADE COLLECTIONS
-    #############################################
     {'name': '1950s Classics', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'primary_release_date.gte': '1950-01-01', 'primary_release_date.lte': '1959-12-31', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': '1960s Classics', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'primary_release_date.gte': '1960-01-01', 'primary_release_date.lte': '1969-12-31', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': '1970s Classics', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'primary_release_date.gte': '1970-01-01', 'primary_release_date.lte': '1979-12-31', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 25, 'target_servers': ['emby']},
@@ -452,18 +144,71 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': '2000s Classics', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'primary_release_date.gte': '2000-01-01', 'primary_release_date.lte': '2009-12-31', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': '2010s Classics', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'primary_release_date.gte': '2010-01-01', 'primary_release_date.lte': '2019-12-31', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': '2020s Classics', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'primary_release_date.gte': '2020-01-01', 'primary_release_date.lte': '2029-12-31', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 25, 'target_servers': ['emby']},
-    
-    #############################################
-    # CATEGORY 8: CRITICALLY ACCLAIMED COLLECTIONS
-    #############################################
     {'name': 'Oscar-Winning Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '1498', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Oscar Best Picture Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '207468', 'sort_by': 'primary_release_date.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Oscar Best Director Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '209485', 'sort_by': 'primary_release_date.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
     {'name': 'Golden Globe-Winning Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '10483', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'BAFTA Award-Winning Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '207362', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Cannes Film Festival Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '2243,209537', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Sundance Film Festival Favorites', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '7994', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Venice Film Festival Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '207868', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Berlin Film Festival Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '209863', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Independent Spirit Award Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '209676', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
     {'name': 'Critically Acclaimed Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'vote_average.gte': 8, 'vote_count.gte': 1000, 'sort_by': 'vote_average.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-    
-    
-    #############################################
-    # CATEGORY 9: ADDITIONAL THEME & KEYWORD COLLECTIONS
-    #############################################
+    {'name': 'Hidden Masterpieces', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'vote_average.gte': 8.5, 'vote_count.gte': 100, 'vote_count.lte': 500, 'sort_by': 'vote_average.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Moana Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1241984, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Karate Kid Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 8580, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'James Bond Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 645, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Dark Knight Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 263, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Star Wars Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 10, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Fast and the Furious Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 9485, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Hannibal Lecter Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 9743, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Terminator Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 528, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Lion King (Reboot) Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 762512, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Devara Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1187990, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Lost Bullet Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1002775, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Minecraft Movie Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1461530, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Alien Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 8091, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Final Destination Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 8864, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Die Hard Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1570, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Ghostbusters Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2980, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Bullet Train Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1471524, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Avengers Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 86311, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Pirates of the Caribbean Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 295, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Spider-Man (MCU) Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 531241, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Matrix Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2344, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Spider-Man Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 556, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Quintessential Quintuplets Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1287339, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'xXx Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 52785, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Ip Man Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 70068, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Avatar Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 87096, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Fault Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1156666, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Mission: Impossible Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 87359, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Jurassic Park Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 328, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Hobbit Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 121938, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Toy Story Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 10194, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Harry Potter Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1241, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Iron Man Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 131292, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Captain America Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 131295, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Legend of Hei Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1444577, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'O Auto da Compadecida: Coleção', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1219938, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Godfather Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 230, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Wild Robot Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1370345, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Twilight Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 33514, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': "Gabriel's Inferno Collection", 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 729322, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Sonic the Hedgehog Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 720879, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Mad Max Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 8945, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Lord of the Rings Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 119, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Psycho Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 119674, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Spider-Man: Spider-Verse Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 573436, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Conjuring Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 313086, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Audience Favorites', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'vote_average.desc', 'vote_count.gte': 1000, 'vote_average.gte': 8}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Recent Box Office Hits', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'revenue.desc', 'primary_release_date.gte': '2024-01-01'}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Hidden Gems', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'vote_average.desc', 'vote_count.gte': 100, 'vote_count.lte': 500, 'vote_average.gte': 7.5}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Blockbusters of All Time', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'revenue.desc', 'vote_count.gte': 500}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Recent Indie Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'popularity.desc', 'primary_release_date.gte': '2023-01-01', 'vote_average.gte': 6, 'with_companies': '194'}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Foreign Language Hits', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'vote_average.desc', 'vote_count.gte': 300, 'with_original_language': 'ko,fr,es,de,ja', 'vote_average.gte': 7}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Top Animated Features', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'vote_average.desc', 'vote_count.gte': 300, 'with_genres': '16', 'vote_average.gte': 7}, 'item_limit': 30, 'target_servers': ['emby']},
     {'name': 'Time Travel Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '4565', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Dystopian Future Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '12565', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Post-Apocalyptic Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '2964', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 25, 'target_servers': ['emby']},
@@ -474,6 +219,36 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'Heist Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '9882', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Space Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '11844', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Coming of Age Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '10683', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Pixar Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '3', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Lucasfilm Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '1', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Marvel Studios Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '420', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Warner Bros. Pictures Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '174', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Universal Pictures Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '33', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': '20th Century Studios Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '25', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Paramount Pictures Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '4', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Columbia Pictures Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '5', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Walt Disney Pictures Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '2', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'DreamWorks Animation Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '521', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Studio Ghibli Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '10342', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'A24 Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '41077', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Lionsgate Films Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '1632', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'New Line Cinema Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '12', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Focus Features Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '10146', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Sony Pictures Animation Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '2251', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'BBC Films Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '146', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Miramax Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '14', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Amblin Entertainment Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '56', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Legendary Pictures Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '923', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Blumhouse Productions Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '3172', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Metro-Goldwyn-Mayer Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '8411', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Working Title Films Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '10163', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Bad Robot Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '11461', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'NEON Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '124052', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'FilmNation Entertainment Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '27551', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'StudioCanal Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '694', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Netflix Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '12177', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Amazon Studios Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '34982', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Apple Studios Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '152952', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
     {'name': 'Road Trip Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '2236', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
     {'name': 'Revenge Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '256227', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
     {'name': 'Coming of Age', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '10683', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
@@ -536,61 +311,6 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'Noir', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '9803', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
     {'name': 'Anthology', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '7062', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
     {'name': 'Unreliable Narrator', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '278069', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
-
-
-    
-    #############################################
-    # CATEGORY 10: AWARD-WINNING COLLECTIONS
-    #############################################
-    {'name': 'Oscar Best Picture Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '207468', 'sort_by': 'primary_release_date.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Oscar Best Director Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '209485', 'sort_by': 'primary_release_date.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'BAFTA Award-Winning Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '207362', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Cannes Film Festival Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '2243,209537', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Sundance Film Festival Favorites', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '7994', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Venice Film Festival Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '207868', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Berlin Film Festival Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '209863', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Independent Spirit Award Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '209676', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Hidden Masterpieces', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'vote_average.gte': 8.5, 'vote_count.gte': 100, 'vote_count.lte': 500, 'sort_by': 'vote_average.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-
-    
-    #############################################
-    # CATEGORY 11: STUDIO COLLECTIONS
-    #############################################
-    {'name': 'Pixar Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '3', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Lucasfilm Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '1', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Marvel Studios Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '420', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Warner Bros. Pictures Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '174', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Universal Pictures Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '33', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': '20th Century Studios Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '25', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Paramount Pictures Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '4', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Columbia Pictures Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '5', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Walt Disney Pictures Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '2', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'DreamWorks Animation Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '521', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Studio Ghibli Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '10342', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'A24 Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '41077', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Lionsgate Films Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '1632', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'New Line Cinema Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '12', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Focus Features Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '10146', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Sony Pictures Animation Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '2251', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'BBC Films Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '146', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Miramax Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '14', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Amblin Entertainment Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '56', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Legendary Pictures Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '923', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Blumhouse Productions Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '3172', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Metro-Goldwyn-Mayer Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '8411', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Working Title Films Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '10163', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Bad Robot Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '11461', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'NEON Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '124052', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'FilmNation Entertainment Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '27551', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'StudioCanal Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '694', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Netflix Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '12177', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Amazon Studios Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '34982', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Apple Studios Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '152952', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
-    
-    
-    #############################################
-    # CATEGORY 12: LANGUAGE & REGIONAL CINEMA
-    #############################################
     {'name': 'French Cinema', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_original_language': 'fr', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
     {'name': 'Italian Cinema', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_original_language': 'it', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
     {'name': 'Japanese Cinema', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_original_language': 'jp', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
@@ -638,11 +358,6 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'East Asian Cinema', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_original_language': 'zh,ja,ko', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
     {'name': 'South Asian Cinema', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_original_language': 'hi,bn,ta,te,ml,kn', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 40, 'target_servers': ['emby']},
     {'name': 'Middle Eastern Cinema', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_original_language': 'ar,fa,he,tr', 'sort_by': 'vote_average.desc', 'vote_count.gte': 20}, 'item_limit': 40, 'target_servers': ['emby']},
-    
-
-    #############################################
-    # CATEGORY 13: CINEMATOGRAPHER COLLECTIONS
-    #############################################
     {'name': 'Films Shot by Roger Deakins', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '151', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Films Shot by Emmanuel Lubezki', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '4185', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Films Shot by Janusz Kamiński', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '492', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
@@ -658,11 +373,46 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'Films Shot by Rodrigo Prieto', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '275', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Films Shot by Linus Sandgren', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '969171', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Films Shot by Rachel Morrison', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '984113', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    
-
-
+    {'name': 'Films Scored by John Williams', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '491', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Hans Zimmer', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '947', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Ennio Morricone', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '1259', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Howard Shore', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '117', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by James Horner', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '1729', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Danny Elfman', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '531', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Bernard Herrmann', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '1045', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Thomas Newman', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '4374763', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Alexandre Desplat', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '2949', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Max Steiner', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '3249', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Jerry Goldsmith', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '1760', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by John Barry', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '2289', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Trent Reznor', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '3186', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Atticus Ross', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '142391', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Jóhann Jóhannsson', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '117992', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Ryuichi Sakamoto', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '3394338', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Toru Takemitsu', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '51808', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Michael Giacchino', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '15347', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Jonny Greenwood', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '74333', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'Films Scored by Hildur Guðnadóttir', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '1178828', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
+    {'name': 'John Wick Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 404609, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Pokémon Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 34055, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Back to the Future Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 264, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Grumpy Old Men Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 119050, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Planet of the Apes (Reboot) Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 173710, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Scary Movie Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 4246, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Tomb Raider Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2467, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Scream Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2602, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Rambo Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 5039, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Despicable Me Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 86066, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Fantastic Beasts Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 435259, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Indiana Jones Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 84, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': "Child's Play Collection", 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 10455, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Thor Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 131296, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Halloween Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 91361, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Shrek Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2150, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'X-Men Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 748, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'American Pie Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2806, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Star Trek: Alternate Reality Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 115575, 'target_servers': ['emby'], 'sort_by': 'release_date'},
 ]
 
 # Alias for compatibility with orchestration logic
-RECIPES = COLLECTION_RECIPES
-
+RECIPES = MEGA_COLLECTION_RECIPES

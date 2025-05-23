@@ -8,7 +8,7 @@ TMDbCollector is a Python application that automatically generates and syncs mov
 - **Smart server detection**: Auto-detects if Emby is configured
 - **Customizable recipes**: Easily edit or extend collection logic in `src/collection_recipes.py`
 - **Robust error handling & logging**
-- **Configurable via YAML and/or .env files**
+- **Configurable via YAML config file**
 
 ## Requirements
 - Python 3.8+ (for direct installation)
@@ -21,7 +21,6 @@ TMDbCollector is a Python application that automatically generates and syncs mov
 1. Create a directory for the project and navigate into it
 2. Create a `config` subdirectory
 3. Create a `config/config.yaml` file with your API keys (see example below)
-4. Create a `.env` file (optional, can be used instead of config.yaml)
 5. Run with Docker Compose:
    ```sh
    docker compose up -d
@@ -29,34 +28,29 @@ TMDbCollector is a Python application that automatically generates and syncs mov
 
 ## Configuration
 
-You can configure TMDbCollector using either:
-
-1. A **config.yaml** file in the config directory (example below)
-2. Environment variables or a **.env** file
+Configure TMDbCollector using a **config.yaml** file in the config directory (example below):
 
 ### Example config.yaml
 
 ```yaml
-tmdb:
-  api_key: your_tmdb_api_key
+# API Keys
+TMDB_API_KEY: "your_tmdb_api_key"
 
-emby:
-  server_url: http://emby:8096
-  api_key: your_emby_api_key
-  user_id: your_emby_user_id
+# Emby Configuration
+EMBY_API_KEY: "your_emby_api_key"
+EMBY_URL: "http://emby:8096"  # Use your actual server address
+EMBY_USER_ID: "your_emby_user_id"
+
+# Jellyfin Configuration
+JELLYFIN_API_KEY: "your_jellyfin_api_key"
+JELLYFIN_URL: "http://jellyfin:8096"  # Use your actual server address
+JELLYFIN_USER_ID: "your_jellyfin_user_id"
+
+# Sync Target
+SYNC_TARGET: "auto"  # Options: auto, emby, jellyfin
 ```
 
-### Example .env file
 
-```env
-TMDB_API_KEY=your_tmdb_api_key
-EMBY_API_KEY=your_emby_api_key
-EMBY_URL=http://localhost:8096  # Use your actual server address
-EMBY_USER_ID=your_emby_user_id
-
-# Choose sync target
-SYNC_TARGET=auto  # Options: auto, emby
-```
 
 ## Installation & Usage
 
@@ -77,14 +71,8 @@ services:
       - ./config:/app/config:ro
     environment:
       - SYNC_TARGET=auto  # Options: auto, emby
-      # Uncomment and fill in if not using config.yaml:
-      # - TMDB_API_KEY=your_tmdb_api_key
-      # - EMBY_API_KEY=your_emby_api_key
-      # - EMBY_URL=http://emby:8096
-      # - EMBY_USER_ID=your_emby_user_id
-    # Alternative: use .env file instead of environment section above
-    # env_file:
-    #   - .env
+      # You can override config.yaml settings with environment variables if needed
+      # - SYNC_TARGET=auto
     restart: unless-stopped
 ```
 

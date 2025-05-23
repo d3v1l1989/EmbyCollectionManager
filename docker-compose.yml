@@ -6,10 +6,8 @@ services:
     container_name: tmdbcollector
     volumes:
       - ./config:/app/config:ro
-    env_file:
-      - .env
-    # Sync targets are controlled via SYNC_TARGET in your .env file
-    # No need to override the command or entrypoint
-    # environment:
-    #   - SYNC_TARGET=auto  # Options: auto, emby
+    # Configuration is controlled via config.yaml
+    # You can still override specific settings with environment variables if needed
+    environment:
+      - SYNC_TARGET=auto  # Options: auto, emby, jellyfin
     restart: unless-stopped
