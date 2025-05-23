@@ -1,26 +1,55 @@
+# Python bytecode and cache
 __pycache__/
+*.py[cod]
+*$py.class
+
+# Configuration files (except examples)
 config/config.yaml
-*.pyc
 
 # Test files
 tests/
-*_test.py
 test_*.py
+*_test.py
+test*.py
+src/testnames.py
+src/testrecipes.py
+test_poster_generator.py
 
-# Recipe generators and files (except collection_recipes.py)
-src/recipe_generators/
-recipes/
-*_recipes.py
+# Collection generators (except collection_recipes.py)
+src/artist_collections.py
+src/studio_collections.py
+src/international_collections.py
+src/theme_collections.py
+src/mega_collection_generator.py
+src/create_default_template.py
+
+# Recipe files (except collection_recipes.py)
+src/*_recipes.py
 !src/collection_recipes.py
+src/enhanced_recipes.py
+src/mega_recipes.py
+src/update_collection_recipes.py
 
-# Check duplicates feature
+# Utility scripts
 check_duplicates.py
 src/check_duplicates.py
+fix_duplicates.py
+src/fix_duplicates.py
+roboto_fonts.zip
+
+# Merge collections
+merge_collections.py
+src/merge_collections.py
 
 # Planning and task files
 PLANNING.md
 TASK.md
 
-# Merge collections
-merge_collections.py
-src/merge_collections.py
+# Temporary files
+*.tmp
+*.temp
+
+# Development environment files
+.vscode/
+.idea/
+.env
