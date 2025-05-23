@@ -33,16 +33,18 @@ Configure TMDbCollector using a **config.yaml** file in the config directory (ex
 ### Example config.yaml
 
 ```yaml
-# API Keys
-TMDB_API_KEY: "your_tmdb_api_key"
+# Config file for TMDbCollector
+# API keys and server details organized by service
 
-# Emby Configuration
-EMBY_API_KEY: "your_emby_api_key"
-EMBY_URL: "http://emby:8096"  # Use your actual server address
-EMBY_USER_ID: "your_emby_user_id"
+# TMDb configuration
+tmdb:
+  api_key: "YOUR_TMDB_API_KEY"
 
-# Sync Target
-SYNC_TARGET: "auto"  # Options: auto, emby
+# Emby configuration
+emby:
+  api_key: "YOUR_EMBY_API_KEY"
+  server_url: "http://emby:8096"  # Use your actual server address
+  user_id: "YOUR_EMBY_USER_ID"
 
 # Custom poster generation settings
 poster_settings:

@@ -1,9 +1,15 @@
-# Example config file for TMDbCollector
-# Fill in your actual API keys and server details
-TMDB_API_KEY: "YOUR_TMDB_API_KEY"
-EMBY_API_KEY: "YOUR_EMBY_API_KEY"
-EMBY_URL: "YOUR_EMBY_URL"
-EMBY_USER_ID: "YOUR_EMBY_USER_ID"
+# Config file for TMDbCollector
+# API keys and server details organized by service
+
+# TMDb configuration
+tmdb:
+  api_key: "YOUR TMDB API KEY"
+
+# Emby configuration
+emby:
+  api_key: "YOUR EMBY API KEY"
+  server_url: "YOUR EMBY URL"
+  user_id: "YOUR EMBY USER ID"
 
 # Custom poster generation settings
 poster_settings:
