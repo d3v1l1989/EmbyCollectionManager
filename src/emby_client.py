@@ -409,8 +409,11 @@ class EmbyClient(MediaServerClient):
     def update_collection_artwork(self, collection_id: str, poster_url: Optional[str]=None, backdrop_url: Optional[str]=None) -> bool:
         """
         Update artwork for an Emby collection using external image URLs.
-        First tries to fetch collection poster from TMDb if not provided, and only falls back to 
-        first movie's poster if no collection poster is available.
+        Order of poster selection:
+        1. Use provided poster_url if any
+        2. Try to fetch collection poster from TMDb
+        3. Generate custom poster if enabled
+        4. Fall back to first movie's poster as last resort
         
         Args:
             collection_id: The Emby collection ID
@@ -429,19 +432,26 @@ class EmbyClient(MediaServerClient):
             return True
             
         success = False
+        collection_data = None
         
         if not collection_id:
             return False
         
-        # If no poster_url is provided, try to fetch collection images directly from TMDb
+        # If no poster_url is provided, try to get one using our priority order
         if not poster_url:
-            logger.info(f"No poster URL provided, attempting to fetch collection images from TMDb")
+            logger.info("No poster URL provided, attempting to find a suitable poster")
+            
+            # First, get the collection details (we'll need this in multiple steps)
             try:
-                # First, get the collection details to find the TMDb collection ID
                 collection_endpoint = f"/Items/{collection_id}?api_key={self.api_key}"
                 collection_data = self._make_api_request('GET', collection_endpoint)
+            except Exception as e:
+                logger.error(f"Error fetching collection data: {e}")
+                collection_data = None
                 
-                if collection_data and 'ProviderIds' in collection_data:
+            # STEP 1: Try to fetch TMDb collection poster if available
+            if collection_data and 'ProviderIds' in collection_data:
+                try:
                     tmdb_id = collection_data['ProviderIds'].get('Tmdb')
                     
                     if tmdb_id:
@@ -461,17 +471,51 @@ class EmbyClient(MediaServerClient):
                                 collection_posters.sort(key=lambda x: x.get('CommunityRating', 0), reverse=True)
                                 poster_url = collection_posters[0].get('Url')
                                 logger.info(f"Found collection poster from TMDb: {poster_url}")
-                            else:
-                                logger.info("No collection poster found in TMDb remote images")
-                        else:
-                            logger.info("No remote images data available for collection")
-                    else:
-                        logger.info("No TMDb ID found for collection")
-                else:
-                    logger.info("Could not retrieve collection data or no provider IDs available")
+                except Exception as e:
+                    logger.error(f"Error fetching TMDb poster: {e}")
+            
+            # STEP 2: If no TMDb poster, try generating a custom poster if enabled
+            if not poster_url and hasattr(self, 'config') and self.config.get('poster_settings', {}).get('enable_custom_posters', True):
+                try:
+                    # Make sure we have collection data with name
+                    if not collection_data or 'Name' not in collection_data:
+                        collection_endpoint = f"/Items/{collection_id}?api_key={self.api_key}"
+                        collection_data = self._make_api_request('GET', collection_endpoint)
                     
-                # If we still don't have a poster URL, try to get poster from the first movie in the collection
-                if not poster_url:
+                    if collection_data and 'Name' in collection_data:
+                        collection_name = collection_data['Name']
+                        
+                        # Get poster settings from config
+                        poster_settings = self.config.get('poster_settings', {})
+                        template_name = poster_settings.get('template_name')
+                        text_color = poster_settings.get('text_color')
+                        text_position = poster_settings.get('text_position')
+                        
+                        # Generate custom poster with configured settings
+                        logger.info(f"Attempting to generate custom poster for collection '{collection_name}'")
+                        custom_poster_path = generate_custom_poster(
+                            collection_name,
+                            template_name=template_name,
+                            text_color=text_color,
+                            text_position=text_position
+                        )
+                        
+                        if custom_poster_path:
+                            # Convert file path to URL
+                            poster_url = file_to_url(custom_poster_path)
+                            logger.info(f"Generated custom poster at: {custom_poster_path}")
+                        else:
+                            logger.warning(f"Failed to generate custom poster for '{collection_name}'")
+                    else:
+                        logger.warning("Could not determine collection name for custom poster generation")
+                except Exception as e:
+                    logger.error(f"Error generating custom poster: {e}")
+            elif not poster_url and not (hasattr(self, 'config') and self.config.get('poster_settings', {}).get('enable_custom_posters', True)):
+                logger.info("Custom poster generation is disabled in config or config not available")
+            
+            # STEP 3: Last resort - If still no poster, try using first movie's poster as fallback
+            if not poster_url:
+                try:
                     logger.info("Falling back to first movie poster in the collection")
                     # Get items in the collection
                     collection_items_endpoint = f"/Items?ParentId={collection_id}&api_key={self.api_key}"
@@ -504,51 +548,8 @@ class EmbyClient(MediaServerClient):
                             logger.info("Could not get ID for the first item in collection")
                     else:
                         logger.info("No items found in collection")
-            except Exception as e:
-                logger.error(f"Error trying to fetch collection/movie poster: {e}")
-        
-        # If still no poster URL found, try generating a custom poster if enabled in config
-        if not poster_url and hasattr(self, 'config') and self.config.get('poster_settings', {}).get('enable_custom_posters', True):
-            # Get collection name from collection data
-            collection_name = None
-            try:
-                if not collection_data or 'Name' not in collection_data:
-                    # Try to fetch collection details if we don't have them yet
-                    collection_endpoint = f"/Items/{collection_id}?api_key={self.api_key}"
-                    collection_data = self._make_api_request('GET', collection_endpoint)
-                
-                if collection_data and 'Name' in collection_data:
-                    collection_name = collection_data['Name']
-                    
-                    # Get poster settings from config
-                    poster_settings = self.config.get('poster_settings', {})
-                    template_name = poster_settings.get('template_name')
-                    text_color = poster_settings.get('text_color')
-                    bg_color = poster_settings.get('bg_color')
-                    text_position = poster_settings.get('text_position')
-                    
-                    # Generate custom poster with configured settings
-                    logger.info(f"Attempting to generate custom poster for collection '{collection_name}'")
-                    custom_poster_path = generate_custom_poster(
-                        collection_name,
-                        template_name=template_name,
-                        text_color=text_color,
-                        bg_color=bg_color,
-                        text_position=text_position
-                    )
-                    
-                    if custom_poster_path:
-                        # Convert file path to URL
-                        poster_url = file_to_url(custom_poster_path)
-                        logger.info(f"Generated custom poster at: {custom_poster_path}")
-                    else:
-                        logger.warning(f"Failed to generate custom poster for '{collection_name}'")
-                else:
-                    logger.warning("Could not determine collection name for custom poster generation")
-            except Exception as e:
-                logger.error(f"Error generating custom poster: {e}")
-        elif not poster_url:
-            logger.info("Custom poster generation is disabled in config or config not available.")
+                except Exception as e:
+                    logger.error(f"Error trying to fetch first movie poster: {e}")
         
         # Update poster if available
         if poster_url:
