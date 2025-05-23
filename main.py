@@ -26,7 +26,15 @@ def main():
         try:
             # Load configuration each run to pick up any changes
             config = ConfigLoader(yaml_path="config/config.yaml")
-            tmdb_api_key = config.get("TMDB_API_KEY")
+            config_dict = config.as_dict()
+            
+            # Check for API key in both new nested format and legacy flat format for backward compatibility
+            tmdb_api_key = None
+            if 'tmdb' in config_dict and isinstance(config_dict['tmdb'], dict) and 'api_key' in config_dict['tmdb']:
+                tmdb_api_key = config_dict['tmdb']['api_key']
+            else:
+                # Fallback to legacy format
+                tmdb_api_key = config.get("TMDB_API_KEY")
             
             if tmdb_api_key and tmdb_api_key != "YOUR_TMDB_API_KEY":
                 logger.info(f"TMDb API key loaded: {tmdb_api_key[:4]}... (hidden)")
@@ -39,7 +47,6 @@ def main():
             logger.info(f"Using sync target: {sync_target}")
             
             # Run the main application logic with the sync target
-            import sys
             # Modify sys.argv to include the targets parameter
             # Clear any previous args to avoid duplication in subsequent runs
             if len(sys.argv) > 1:
