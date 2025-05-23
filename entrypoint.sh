@@ -3,10 +3,9 @@ set -e
 
 CMD="python main.py"
 
-# If using legacy SYNC_EMBY/SYNC_JELLYFIN vars, handle them for backward compatibility
-if [ "$SYNC_EMBY" = "1" ] || [ "$SYNC_JELLYFIN" = "1" ]; then
-    [ "$SYNC_EMBY" = "1" ] && CMD="$CMD --sync_emby"
-    [ "$SYNC_JELLYFIN" = "1" ] && CMD="$CMD --sync_jellyfin"
+# If using legacy SYNC_EMBY var, handle it for backward compatibility
+if [ "$SYNC_EMBY" = "1" ]; then
+    CMD="$CMD --sync_emby"
 else
     # New approach: use SYNC_TARGET if set, otherwise use 'auto' detection
     if [ -n "$SYNC_TARGET" ]; then

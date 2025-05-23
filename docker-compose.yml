@@ -9,5 +9,5 @@ services:
     # Configuration is controlled via config.yaml
     # You can still override specific settings with environment variables if needed
     environment:
-      - SYNC_TARGET=auto  # Options: auto, emby, jellyfin
+      - SYNC_TARGET=auto  # Options: auto, emby
     restart: unless-stopped
