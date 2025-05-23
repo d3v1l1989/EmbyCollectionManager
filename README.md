@@ -43,6 +43,19 @@ EMBY_USER_ID: "your_emby_user_id"
 
 # Sync Target
 SYNC_TARGET: "auto"  # Options: auto, emby
+
+# Custom poster generation settings
+poster_settings:
+  # Enable/disable custom poster generation when TMDb doesn't provide one
+  enable_custom_posters: true
+  
+  # Template settings
+  template_name: "default.jpg"  # Template file in resources/templates/
+  
+  # Text settings
+  text_color: [255, 255, 255]  # RGB values for text color (white)
+  bg_color: [0, 0, 0, 128]     # RGBA values for text background (semi-transparent black)
+  text_position: 0.8           # Vertical position of text (0-1), 0.8 = 80% from top
 ```
 
 
