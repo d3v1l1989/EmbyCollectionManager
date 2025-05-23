@@ -52,7 +52,7 @@ poster_settings:
   enable_custom_posters: true
   
   # Template settings
-  template_name: "default.jpg"  # Template file in resources/templates/
+  template_name: "default.png"  # Template file in resources/templates/
   
   # Text settings
   text_color: [255, 255, 255]  # RGB values for text color (white)
