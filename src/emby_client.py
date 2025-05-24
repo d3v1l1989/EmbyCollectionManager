@@ -469,7 +469,7 @@ class EmbyClient(MediaServerClient):
             
             # First, get the collection details (we'll need this in multiple steps)
             try:
-                collection_endpoint = f"/Items/{collection_id}?api_key={self.api_key}"
+                collection_endpoint = f"/Users/{self.user_id}/Items/{collection_id}?api_key={self.api_key}"
                 collection_data = self._make_api_request('GET', collection_endpoint)
             except Exception as e:
                 logger.error(f"Error fetching collection data: {e}")
@@ -483,7 +483,7 @@ class EmbyClient(MediaServerClient):
                     if tmdb_id:
                         logger.info(f"Found TMDb collection ID: {tmdb_id}")
                         # Use remote images endpoint to get available images for the collection
-                        remote_images_endpoint = f"/Items/{collection_id}/RemoteImages?api_key={self.api_key}"
+                        remote_images_endpoint = f"/Users/{self.user_id}/Items/{collection_id}/RemoteImages?api_key={self.api_key}"
                         remote_images_data = self._make_api_request('GET', remote_images_endpoint)
                         
                         # Look for collection poster in remote images
@@ -505,7 +505,7 @@ class EmbyClient(MediaServerClient):
                 try:
                     # Make sure we have collection data with name
                     if not collection_data or 'Name' not in collection_data:
-                        collection_endpoint = f"/Items/{collection_id}?api_key={self.api_key}"
+                        collection_endpoint = f"/Users/{self.user_id}/Items/{collection_id}?api_key={self.api_key}"
                         collection_data = self._make_api_request('GET', collection_endpoint)
                     
                     if collection_data and 'Name' in collection_data:
@@ -544,7 +544,7 @@ class EmbyClient(MediaServerClient):
                 try:
                     logger.info("Falling back to first movie poster in the collection")
                     # Get items in the collection
-                    collection_items_endpoint = f"/Items?ParentId={collection_id}&api_key={self.api_key}"
+                    collection_items_endpoint = f"/Users/{self.user_id}/Items?ParentId={collection_id}&api_key={self.api_key}"
                     items_data = self._make_api_request('GET', collection_items_endpoint)
                     
                     if items_data and 'Items' in items_data and items_data['Items']:
@@ -553,7 +553,7 @@ class EmbyClient(MediaServerClient):
                         
                         if first_item_id:
                             # Get remote images for the first item
-                            item_images_endpoint = f"/Items/{first_item_id}/RemoteImages?api_key={self.api_key}"
+                            item_images_endpoint = f"/Users/{self.user_id}/Items/{first_item_id}/RemoteImages?api_key={self.api_key}"
                             item_images_data = self._make_api_request('GET', item_images_endpoint)
                             
                             if item_images_data and 'Images' in item_images_data:
@@ -581,7 +581,7 @@ class EmbyClient(MediaServerClient):
         if poster_url:
             logger.info(f"Attempting to set poster for {collection_id} with URL: {poster_url}")
             try:
-                url = f"{self.server_url}/Items/{collection_id}/RemoteImages/Download?api_key={self.api_key}"
+                url = f"{self.server_url}/Users/{self.user_id}/Items/{collection_id}/RemoteImages/Download?api_key={self.api_key}"
                 payload = {
                     "Type": "Primary",
                     "ImageUrl": poster_url,
@@ -601,7 +601,7 @@ class EmbyClient(MediaServerClient):
         if backdrop_url:
             logger.info(f"Attempting to set backdrop for {collection_id} with URL: {backdrop_url}")
             try:
-                url = f"{self.server_url}/Items/{collection_id}/RemoteImages/Download?api_key={self.api_key}"
+                url = f"{self.server_url}/Users/{self.user_id}/Items/{collection_id}/RemoteImages/Download?api_key={self.api_key}"
                 payload = {
                     "Type": "Backdrop",
                     "ImageUrl": backdrop_url,
