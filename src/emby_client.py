@@ -469,7 +469,8 @@ class EmbyClient(MediaServerClient):
             
             # First, get the collection details (we'll need this in multiple steps)
             try:
-                collection_endpoint = f"/items/{collection_id}?api_key={self.api_key}"
+                # Use uppercase /Items/ for getting item information
+                collection_endpoint = f"/Items/{collection_id}?api_key={self.api_key}"
                 collection_data = self._make_api_request('GET', collection_endpoint)
             except Exception as e:
                 logger.error(f"Error fetching collection data: {e}")
@@ -482,8 +483,8 @@ class EmbyClient(MediaServerClient):
                     
                     if tmdb_id:
                         logger.info(f"Found TMDb collection ID: {tmdb_id}")
-                        # Use remote images endpoint to get available images for the collection
-                        remote_images_endpoint = f"/items/{collection_id}/RemoteImages?api_key={self.api_key}"
+                        # Use uppercase /Items/ for remote images
+                        remote_images_endpoint = f"/Items/{collection_id}/RemoteImages?api_key={self.api_key}"
                         remote_images_data = self._make_api_request('GET', remote_images_endpoint)
                         
                         # Look for collection poster in remote images
@@ -505,7 +506,7 @@ class EmbyClient(MediaServerClient):
                 try:
                     # Make sure we have collection data with name
                     if not collection_data or 'Name' not in collection_data:
-                        collection_endpoint = f"/items/{collection_id}?api_key={self.api_key}"
+                        collection_endpoint = f"/Items/{collection_id}?api_key={self.api_key}"
                         collection_data = self._make_api_request('GET', collection_endpoint)
                     
                     if collection_data and 'Name' in collection_data:
@@ -544,7 +545,7 @@ class EmbyClient(MediaServerClient):
                 try:
                     logger.info("Falling back to first movie poster in the collection")
                     # Get items in the collection
-                    collection_items_endpoint = f"/items?ParentId={collection_id}&api_key={self.api_key}"
+                    collection_items_endpoint = f"/Items?ParentId={collection_id}&api_key={self.api_key}"
                     items_data = self._make_api_request('GET', collection_items_endpoint)
                     
                     if items_data and 'Items' in items_data and items_data['Items']:
@@ -553,7 +554,7 @@ class EmbyClient(MediaServerClient):
                         
                         if first_item_id:
                             # Get remote images for the first item
-                            item_images_endpoint = f"/items/{first_item_id}/RemoteImages?api_key={self.api_key}"
+                            item_images_endpoint = f"/Items/{first_item_id}/RemoteImages?api_key={self.api_key}"
                             item_images_data = self._make_api_request('GET', item_images_endpoint)
                             
                             if item_images_data and 'Images' in item_images_data:
@@ -581,22 +582,32 @@ class EmbyClient(MediaServerClient):
         if poster_url:
             logger.info(f"Attempting to set poster for {collection_id} with URL: {poster_url}")
             try:
-                # Using the Posterizarr approach - direct binary upload
-                url = f"{self.server_url}/items/{collection_id}/images/Primary?api_key={self.api_key}"
-                logger.info(f"Updating poster for collection {collection_id} using direct upload")
-                
                 # Download image from URL first
                 try:
+                    # Download the image
                     image_response = requests.get(poster_url, timeout=15)
                     image_response.raise_for_status()
                     image_data = image_response.content
                     
-                    # Convert image data to Base64 string (this is what Emby expects)
-                    import base64
-                    image_data_base64 = base64.b64encode(image_data).decode('utf-8')
+                    # Determine content type based on URL
+                    if poster_url.lower().endswith('.jpg') or poster_url.lower().endswith('.jpeg'):
+                        content_type = 'image/jpeg'
+                    elif poster_url.lower().endswith('.png'):
+                        content_type = 'image/png'
+                    else:
+                        content_type = 'image/jpeg'  # Default to JPEG
                     
-                    # Then upload the Base64 encoded data
-                    response = self.session.post(url, data=image_data_base64, timeout=15)
+                    # Try with lowercase URL first (as seen in Posterizarr)
+                    url = f"{self.server_url}/Items/{collection_id}/Images/Primary?api_key={self.api_key}"
+                    logger.info(f"Updating poster for collection {collection_id} using content type: {content_type}")
+                    
+                    # Setup proper headers
+                    headers = {
+                        'Content-Type': content_type
+                    }
+                    
+                    # Then upload the binary data directly with headers
+                    response = self.session.post(url, data=image_data, headers=headers, timeout=15)
                     if response.status_code in [200, 204]:
                         success = True
                         logger.info(f"Poster update successful (status: {response.status_code})")
@@ -611,22 +622,32 @@ class EmbyClient(MediaServerClient):
         if backdrop_url:
             logger.info(f"Attempting to set backdrop for {collection_id} with URL: {backdrop_url}")
             try:
-                # Using the Posterizarr approach - direct binary upload
-                url = f"{self.server_url}/items/{collection_id}/images/Backdrop?api_key={self.api_key}"
-                logger.info(f"Updating backdrop for collection {collection_id} using direct upload")
-                
                 # Download image from URL first
                 try:
+                    # Download the image
                     image_response = requests.get(backdrop_url, timeout=15)
                     image_response.raise_for_status()
                     image_data = image_response.content
                     
-                    # Convert image data to Base64 string (this is what Emby expects)
-                    import base64
-                    image_data_base64 = base64.b64encode(image_data).decode('utf-8')
+                    # Determine content type based on URL
+                    if backdrop_url.lower().endswith('.jpg') or backdrop_url.lower().endswith('.jpeg'):
+                        content_type = 'image/jpeg'
+                    elif backdrop_url.lower().endswith('.png'):
+                        content_type = 'image/png'
+                    else:
+                        content_type = 'image/jpeg'  # Default to JPEG
                     
-                    # Then upload the Base64 encoded data
-                    response = self.session.post(url, data=image_data_base64, timeout=15)
+                    # Try with correct URL path
+                    url = f"{self.server_url}/Items/{collection_id}/Images/Backdrop?api_key={self.api_key}"
+                    logger.info(f"Updating backdrop for collection {collection_id} using content type: {content_type}")
+                    
+                    # Setup proper headers
+                    headers = {
+                        'Content-Type': content_type
+                    }
+                    
+                    # Then upload the binary data directly with headers
+                    response = self.session.post(url, data=image_data, headers=headers, timeout=15)
                     if response.status_code in [200, 204]:
                         success = True
                         logger.info(f"Backdrop update successful (status: {response.status_code})")
