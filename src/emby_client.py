@@ -679,25 +679,8 @@ class EmbyClient(MediaServerClient):
             current_params['api_key'] = self.api_key
             
         try:
-            # Construct the full URL
-            final_url: str
-            if endpoint.lower().startswith('http'): # Absolute URL
-                final_url = endpoint
-            else: # Relative path
-                normalized_server_url = self.server_url.rstrip('/')
-                if not normalized_server_url.endswith('/emby'):
-                    base_api_url = f"{normalized_server_url}/emby"
-                else:
-                    base_api_url = normalized_server_url # Already ends with /emby
-
-                # Ensure endpoint starts with a single slash
-                current_endpoint_path = endpoint
-                if not current_endpoint_path.startswith('/'):
-                    current_endpoint_path = f"/{current_endpoint_path}"
-                
-                final_url = f"{base_api_url}{current_endpoint_path}"
-
-            response = self.session.request(method, final_url, params=current_params, json=json_data, timeout=30, **kwargs)
+            url = f"{self.server_url}{endpoint}" if not endpoint.lower().startswith('http') else endpoint
+            response = self.session.request(method, url, params=current_params, json=json_data, timeout=30, **kwargs)
             response.raise_for_status()
             
             # Handle 204 No Content responses (successful but no body)
