@@ -436,7 +436,17 @@ def generate_custom_poster(
             draw.text(position, collection_name, font=font, fill=text_color)
         
         # Save to temp location
-        img.save(output_path, "JPEG", quality=DEFAULT_IMAGE_QUALITY)
+        # Convert to RGB mode if the image has an alpha channel (RGBA), as JPEG doesn't support transparency
+        if img.mode == 'RGBA':
+            # Create a new RGB image with white background
+            rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+            # Paste the original image on top, using its alpha channel as mask
+            rgb_img.paste(img, mask=img.split()[3])  # The 4th channel is the alpha
+            # Save the RGB image as JPEG
+            rgb_img.save(output_path, "JPEG", quality=DEFAULT_IMAGE_QUALITY)
+        else:
+            # Image is already in RGB mode, save directly
+            img.save(output_path, "JPEG", quality=DEFAULT_IMAGE_QUALITY)
         logger.info(f"Successfully generated custom poster for '{collection_name}' at {output_path}")
         
         return output_path
