@@ -649,7 +649,7 @@ class EmbyClient(MediaServerClient):
         
         # Ensure API key is included in requests
         current_params = params.copy() if params else {}
-        if 'api_key' not in current_params and not endpoint.lower().startswith('http'):
+        if 'api_key' not in current_params and 'api_key=' not in endpoint and not endpoint.lower().startswith('http'):
             current_params['api_key'] = self.api_key
             
         try:
