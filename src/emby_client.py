@@ -601,18 +601,44 @@ class EmbyClient(MediaServerClient):
                     import base64
                     image_data_base64 = base64.b64encode(image_data).decode('utf-8')
                     
-                    # Use lowercase URL exactly as Posterizarr does
-                    url = f"{self.server_url}/items/{collection_id}/images/Primary?api_key={self.api_key}"
-                    logger.info(f"Updating poster for collection {collection_id} using content type: {content_type}")
+                    # Try multiple endpoint patterns for BoxSets - they might be different from regular items
+                    endpoints_to_try = [
+                        # Try standard item endpoints
+                        f"/Items/{collection_id}/Images/Primary?api_key={self.api_key}",
+                        f"/items/{collection_id}/images/Primary?api_key={self.api_key}",
+                        # Try BoxSet specific endpoints (if any)
+                        f"/BoxSets/{collection_id}/Images/Primary?api_key={self.api_key}",
+                        f"/boxsets/{collection_id}/images/Primary?api_key={self.api_key}",
+                        # Try variations with different path structures
+                        f"/emby/Items/{collection_id}/Images/Primary?api_key={self.api_key}",
+                        f"/emby/items/{collection_id}/images/Primary?api_key={self.api_key}"
+                    ]
                     
-                    # No additional headers - just content type as parameter
-                    # This exactly matches Posterizarr implementation
-                    response = self.session.post(url, data=image_data_base64, headers={'Content-Type': content_type}, timeout=15)
-                    if response.status_code in [200, 204]:
-                        success = True
-                        logger.info(f"Poster update successful (status: {response.status_code})")
-                    else:
-                        logger.error(f"Failed to update poster (status: {response.status_code}) - {response.text}")
+                    success_flag = False
+                    
+                    for endpoint in endpoints_to_try:
+                        try:
+                            full_url = self.server_url + endpoint if not endpoint.startswith('http') else endpoint
+                            logger.info(f"Trying to update poster with endpoint: {endpoint}")
+                            
+                            # Try the endpoint with different content options
+                            response = self.session.post(full_url, data=image_data_base64, 
+                                                        headers={'Content-Type': content_type}, 
+                                                        timeout=15)
+                            
+                            if response.status_code in [200, 204]:
+                                success = True
+                                success_flag = True
+                                logger.info(f"Poster update successful with endpoint {endpoint} (status: {response.status_code})")
+                                break
+                            else:
+                                logger.warning(f"Failed with endpoint {endpoint} (status: {response.status_code}) - {response.text[:100]}")
+                        except Exception as inner_e:
+                            logger.warning(f"Error with endpoint {endpoint}: {inner_e}")
+                    
+                    if not success_flag:
+                        logger.error("All poster upload attempts failed.")
+                        
                 except requests.RequestException as e:
                     logger.error(f"Error downloading/uploading image from URL {poster_url}: {e}")
             except Exception as e:
@@ -641,18 +667,44 @@ class EmbyClient(MediaServerClient):
                     import base64
                     image_data_base64 = base64.b64encode(image_data).decode('utf-8')
                     
-                    # Use lowercase URL exactly as Posterizarr does
-                    url = f"{self.server_url}/items/{collection_id}/images/Backdrop?api_key={self.api_key}"
-                    logger.info(f"Updating backdrop for collection {collection_id} using content type: {content_type}")
+                    # Try multiple endpoint patterns for BoxSets - they might be different from regular items
+                    endpoints_to_try = [
+                        # Try standard item endpoints
+                        f"/Items/{collection_id}/Images/Backdrop?api_key={self.api_key}",
+                        f"/items/{collection_id}/images/Backdrop?api_key={self.api_key}",
+                        # Try BoxSet specific endpoints (if any)
+                        f"/BoxSets/{collection_id}/Images/Backdrop?api_key={self.api_key}",
+                        f"/boxsets/{collection_id}/images/Backdrop?api_key={self.api_key}",
+                        # Try variations with different path structures
+                        f"/emby/Items/{collection_id}/Images/Backdrop?api_key={self.api_key}",
+                        f"/emby/items/{collection_id}/images/Backdrop?api_key={self.api_key}"
+                    ]
                     
-                    # No additional headers - just content type as parameter
-                    # This exactly matches Posterizarr implementation
-                    response = self.session.post(url, data=image_data_base64, headers={'Content-Type': content_type}, timeout=15)
-                    if response.status_code in [200, 204]:
-                        success = True
-                        logger.info(f"Backdrop update successful (status: {response.status_code})")
-                    else:
-                        logger.error(f"Failed to update backdrop (status: {response.status_code}) - {response.text}")
+                    success_flag = False
+                    
+                    for endpoint in endpoints_to_try:
+                        try:
+                            full_url = self.server_url + endpoint if not endpoint.startswith('http') else endpoint
+                            logger.info(f"Trying to update backdrop with endpoint: {endpoint}")
+                            
+                            # Try the endpoint with different content options
+                            response = self.session.post(full_url, data=image_data_base64, 
+                                                        headers={'Content-Type': content_type}, 
+                                                        timeout=15)
+                            
+                            if response.status_code in [200, 204]:
+                                success = True
+                                success_flag = True
+                                logger.info(f"Backdrop update successful with endpoint {endpoint} (status: {response.status_code})")
+                                break
+                            else:
+                                logger.warning(f"Failed with endpoint {endpoint} (status: {response.status_code}) - {response.text[:100]}")
+                        except Exception as inner_e:
+                            logger.warning(f"Error with endpoint {endpoint}: {inner_e}")
+                    
+                    if not success_flag:
+                        logger.error("All backdrop upload attempts failed.")
+                        
                 except requests.RequestException as e:
                     logger.error(f"Error downloading/uploading image from URL {backdrop_url}: {e}")
             except Exception as e:
