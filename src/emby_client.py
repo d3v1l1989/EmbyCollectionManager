@@ -584,10 +584,22 @@ class EmbyClient(MediaServerClient):
             try:
                 # Download image from URL first
                 try:
-                    # Download the image
-                    image_response = requests.get(poster_url, timeout=15)
-                    image_response.raise_for_status()
-                    image_data = image_response.content
+                    # Handle local file URLs differently from HTTP URLs
+                    if poster_url.startswith('file://'):
+                        # For local files, read the file directly instead of using requests
+                        try:
+                            file_path = poster_url[7:]  # Remove 'file://' prefix
+                            with open(file_path, 'rb') as f:
+                                image_data = f.read()
+                            logger.debug(f"Successfully read local file: {file_path}")
+                        except Exception as e:
+                            logger.error(f"Error reading local file {file_path}: {e}")
+                            raise
+                    else:
+                        # For remote URLs, use requests as normal
+                        image_response = requests.get(poster_url, timeout=15)
+                        image_response.raise_for_status()
+                        image_data = image_response.content
                     
                     # Determine content type based on URL
                     if poster_url.lower().endswith('.jpg') or poster_url.lower().endswith('.jpeg'):
@@ -627,10 +639,22 @@ class EmbyClient(MediaServerClient):
             try:
                 # Download image from URL first
                 try:
-                    # Download the image
-                    image_response = requests.get(backdrop_url, timeout=15)
-                    image_response.raise_for_status()
-                    image_data = image_response.content
+                    # Handle local file URLs differently from HTTP URLs
+                    if backdrop_url.startswith('file://'):
+                        # For local files, read the file directly instead of using requests
+                        try:
+                            file_path = backdrop_url[7:]  # Remove 'file://' prefix
+                            with open(file_path, 'rb') as f:
+                                image_data = f.read()
+                            logger.debug(f"Successfully read local file: {file_path}")
+                        except Exception as e:
+                            logger.error(f"Error reading local file {file_path}: {e}")
+                            raise
+                    else:
+                        # For remote URLs, use requests as normal
+                        image_response = requests.get(backdrop_url, timeout=15)
+                        image_response.raise_for_status()
+                        image_data = image_response.content
                     
                     # Determine content type based on URL
                     if backdrop_url.lower().endswith('.jpg') or backdrop_url.lower().endswith('.jpeg'):
