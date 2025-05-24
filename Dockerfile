@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 COPY main.py ./
 COPY config/ ./config/
+COPY resources/ ./resources/
 
 # Expose config volume for mounting secrets/configs
 VOLUME ["/app/config"]
