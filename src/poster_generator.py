@@ -269,8 +269,12 @@ def generate_custom_poster(
                 lines.append(' '.join(current_line))
                 
             # Draw each line with shadow effect for readability
-            total_height = len(lines) * (text_height + 20)  # 20px spacing (increased for larger text)
-            start_y = y_position - (total_height / 2) + (text_height / 2)
+            line_spacing = 20  # Spacing between lines (in pixels)
+            total_height = len(lines) * (text_height + line_spacing)  # Calculate total text block height
+            
+            # Calculate vertical starting position to center the entire text block
+            # For text_position=0.5, this will center the text block in the middle of the image
+            start_y = (h * text_position) - (total_height / 2)
             
             for i, line in enumerate(lines):
                 # Get line width with proper error handling
@@ -282,8 +286,12 @@ def generate_custom_poster(
                 else:
                     line_width = int(len(line) * font_size * 0.6)  # Rough estimate
                     
-                # Ensure text is centered but absolutely stays within margins
-                line_x = max(margin_x, (w - line_width) / 2)
+                # Center each line horizontally
+                line_x = (w - line_width) / 2  # Start with perfect centering
+                
+                # Only apply margin constraints if text would extend beyond safe area
+                if line_x < margin_x:
+                    line_x = margin_x  # Constrain to left margin
                 
                 # Double-check that text doesn't extend beyond right margin
                 if line_x + line_width > w - margin_x:
@@ -309,7 +317,7 @@ def generate_custom_poster(
                             else:
                                 line_width = int(len(line) * font_size * 0.6)
                     
-                line_y = start_y + i * (text_height + 20)  # Increased spacing
+                line_y = start_y + i * (text_height + line_spacing)
                 
                 # Draw text shadow/outline for contrast without background
                 shadow_color = (0, 0, 0, 180)  # Semi-transparent black for shadow
@@ -324,11 +332,15 @@ def generate_custom_poster(
                 draw.text((line_x, line_y), line, font=font, fill=text_color)
         else:
             # Draw single line text with shadow for better readability
-            # Define margins to keep text away from edges (10% of width on each side)
-            margin_x = int(w * 0.1)
+            # Use the same margin as calculated earlier for consistency
+            # margin_x is already defined above using DEFAULT_MARGIN_PCT
             
-            # Ensure text stays within margins
-            x_position = max(margin_x, (w - text_width) / 2)
+            # Center text horizontally
+            x_position = (w - text_width) / 2
+            
+            # Only constrain to margins if text would extend beyond safe area
+            if x_position < margin_x:
+                x_position = margin_x
             
             # Double-check that text doesn't extend beyond right margin
             if x_position + text_width > w - margin_x:
@@ -361,8 +373,11 @@ def generate_custom_poster(
                         lines.append(' '.join(current_line))
                     
                     # Draw each line with shadow effect for readability
-                    total_height = len(lines) * (text_height + 20)  # 20px spacing (increased for larger text)
-                    start_y = y_position - (total_height / 2) + (text_height / 2)
+                    line_spacing = 20  # Spacing between lines (in pixels)
+                    total_height = len(lines) * (text_height + line_spacing)
+                    
+                    # Calculate vertical starting position to center the entire text block
+                    start_y = (h * text_position) - (total_height / 2)
                     
                     for i, line in enumerate(lines):
                         # Get line width with error handling
@@ -374,8 +389,12 @@ def generate_custom_poster(
                         else:
                             line_width = int(len(line) * font_size * 0.6)
                         
-                        # Position each line with proper bounds checking
-                        line_x = max(margin_x, (w - line_width) / 2)
+                        # Center each line horizontally (consistent with above)
+                        line_x = (w - line_width) / 2
+                        
+                        # Only apply margin constraints if needed
+                        if line_x < margin_x:
+                            line_x = margin_x
                         if line_x + line_width > w - margin_x:
                             line_x = margin_x
                             # Truncate if still too wide
@@ -400,7 +419,10 @@ def generate_custom_poster(
                     # Skip the regular single-line drawing code by returning early
                     return output_path
                 
-            position = (x_position, y_position)
+            # Adjust vertical position to better center single line text
+            # For single line text, we can use the exact vertical position
+            adjusted_y_position = (h * text_position) - (text_height / 2)
+            position = (x_position, adjusted_y_position)
             
             # Draw text shadow/outline for contrast without background
             shadow_color = (0, 0, 0, 180)  # Semi-transparent black for shadow
