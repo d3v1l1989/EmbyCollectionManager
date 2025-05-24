@@ -597,17 +597,17 @@ class EmbyClient(MediaServerClient):
                     else:
                         content_type = 'image/jpeg'  # Default to JPEG
                     
-                    # Try with lowercase URL first (as seen in Posterizarr)
-                    url = f"{self.server_url}/Items/{collection_id}/Images/Primary?api_key={self.api_key}"
+                    # Convert image data to Base64 string - THIS IS CRITICAL
+                    import base64
+                    image_data_base64 = base64.b64encode(image_data).decode('utf-8')
+                    
+                    # Use lowercase URL exactly as Posterizarr does
+                    url = f"{self.server_url}/items/{collection_id}/images/Primary?api_key={self.api_key}"
                     logger.info(f"Updating poster for collection {collection_id} using content type: {content_type}")
                     
-                    # Setup proper headers
-                    headers = {
-                        'Content-Type': content_type
-                    }
-                    
-                    # Then upload the binary data directly with headers
-                    response = self.session.post(url, data=image_data, headers=headers, timeout=15)
+                    # No additional headers - just content type as parameter
+                    # This exactly matches Posterizarr implementation
+                    response = self.session.post(url, data=image_data_base64, headers={'Content-Type': content_type}, timeout=15)
                     if response.status_code in [200, 204]:
                         success = True
                         logger.info(f"Poster update successful (status: {response.status_code})")
@@ -637,17 +637,17 @@ class EmbyClient(MediaServerClient):
                     else:
                         content_type = 'image/jpeg'  # Default to JPEG
                     
-                    # Try with correct URL path
-                    url = f"{self.server_url}/Items/{collection_id}/Images/Backdrop?api_key={self.api_key}"
+                    # Convert image data to Base64 string - THIS IS CRITICAL
+                    import base64
+                    image_data_base64 = base64.b64encode(image_data).decode('utf-8')
+                    
+                    # Use lowercase URL exactly as Posterizarr does
+                    url = f"{self.server_url}/items/{collection_id}/images/Backdrop?api_key={self.api_key}"
                     logger.info(f"Updating backdrop for collection {collection_id} using content type: {content_type}")
                     
-                    # Setup proper headers
-                    headers = {
-                        'Content-Type': content_type
-                    }
-                    
-                    # Then upload the binary data directly with headers
-                    response = self.session.post(url, data=image_data, headers=headers, timeout=15)
+                    # No additional headers - just content type as parameter
+                    # This exactly matches Posterizarr implementation
+                    response = self.session.post(url, data=image_data_base64, headers={'Content-Type': content_type}, timeout=15)
                     if response.status_code in [200, 204]:
                         success = True
                         logger.info(f"Backdrop update successful (status: {response.status_code})")
