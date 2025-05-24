@@ -6,10 +6,11 @@ class MediaServerClient:
     Base class for media server clients (Emby, Jellyfin).
     Provides shared request logic and interface.
     """
-    def __init__(self, server_url: str, api_key: str, user_id: str):
+    def __init__(self, server_url: str, api_key: str, user_id: str, config=None):
         self.server_url = server_url.rstrip('/')
         self.api_key = api_key
         self.user_id = user_id
+        self.config = config
         self.session = requests.Session()
         self.session.headers.update({
             'X-Emby-Token': self.api_key,

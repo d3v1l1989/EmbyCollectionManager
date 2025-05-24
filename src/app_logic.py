@@ -76,7 +76,8 @@ def main():
             emby = EmbyClient(
                 server_url=config['emby']['server_url'],
                 api_key=config['emby']['api_key'],
-                user_id=config['emby']['user_id']
+                user_id=config['emby']['user_id'],
+                config=config
             )
             logger.info("Emby client initialized successfully")
         except Exception as e:
