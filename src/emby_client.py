@@ -428,6 +428,32 @@ class EmbyClient(MediaServerClient):
             collection_name = self._temp_collections[collection_id]
             logger.info(f"Cannot update artwork for pseudo-collection '{collection_name}'")
             logger.info(f"To use artwork, create the collection manually in your Emby web interface.")
+            
+            # For placeholder collections, try to generate a custom poster for future use
+            if hasattr(self, 'config') and self.config.get('poster_settings', {}).get('enable_custom_posters', True):
+                try:
+                    # Get poster settings from config
+                    poster_settings = self.config.get('poster_settings', {})
+                    template_name = poster_settings.get('template_name')
+                    text_color = poster_settings.get('text_color')
+                    text_position = poster_settings.get('text_position')
+                    
+                    logger.info(f"Generating custom poster for future use with collection '{collection_name}'")
+                    custom_poster_path = generate_custom_poster(
+                        collection_name,
+                        template_name=template_name,
+                        text_color=text_color,
+                        text_position=text_position
+                    )
+                    
+                    if custom_poster_path:
+                        logger.info(f"Generated custom poster for '{collection_name}' at: {custom_poster_path}")
+                        logger.info(f"This poster will be available for manual assignment after creating the collection.")
+                    else:
+                        logger.warning(f"Failed to generate custom poster for '{collection_name}'")
+                except Exception as e:
+                    logger.error(f"Error generating custom poster for placeholder collection: {e}")
+            
             # We'll pretend it succeeded since we can't do anything about it
             return True
             
