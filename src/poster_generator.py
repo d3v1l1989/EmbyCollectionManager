@@ -30,7 +30,7 @@ DEFAULT_POSTER_SIZE = (1000, 1500)
 DEFAULT_MARGIN_PCT = 0.105  # Reduced margins by 30% (from 15% to 10.5%)
 
 # Default font path - using the OpenSans-Bold.ttf font we placed in resources/fonts
-DEFAULT_FONT_PATH = "OpenSans-Bold.ttf"
+DEFAULT_FONT_PATH = "OpenSans-Bold.ttf"  # Just the filename, full path is constructed when needed
 
 
 def generate_custom_poster(
@@ -73,7 +73,26 @@ def generate_custom_poster(
             text_position = DEFAULT_TEXT_POSITION
     # Set up paths
     if not resources_dir:
-        resources_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
+        # Try multiple possible locations for resources directory
+        possible_locations = [
+            # Standard location relative to script
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources"),
+            # Docker container standard location
+            "/app/resources",
+            # Additional fallback locations
+            os.path.join(os.path.dirname(__file__), "resources"),
+            "/opt/tmdbcollector/resources"
+        ]
+        
+        for location in possible_locations:
+            if os.path.exists(location) and os.path.isdir(location):
+                resources_dir = location
+                logger.debug(f"Found resources directory at: {resources_dir}")
+                break
+        else:
+            logger.warning(f"Could not find resources directory in any of the expected locations: {possible_locations}")
+            # Fallback to default even if it might not exist
+            resources_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
     
     template_path = os.path.join(resources_dir, "templates", template_name or DEFAULT_TEMPLATE)
     
@@ -81,6 +100,38 @@ def generate_custom_poster(
     if not os.path.exists(template_path):
         logger.error(f"Template image not found: {template_path}")
         return None
+        
+    # Set up font path
+    if font_path is None:
+        font_dirs = [
+            os.path.join(resources_dir, "fonts"),
+            "/app/resources/fonts",
+            "/usr/share/fonts/truetype",
+            "/usr/share/fonts/TTF"
+        ]
+        
+        # Try to find the font in our resources directories first
+        for font_dir in font_dirs:
+            potential_font_path = os.path.join(font_dir, DEFAULT_FONT_PATH)
+            if os.path.exists(potential_font_path):
+                font_path = potential_font_path
+                logger.debug(f"Found font at: {font_path}")
+                break
+        else:
+            # Fallback to a system font if our custom font isn't found
+            logger.warning(f"Could not find font {DEFAULT_FONT_PATH} in any expected locations")
+            # On Linux try some common system fonts as fallbacks
+            fallback_fonts = [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+            ]
+            
+            for fallback in fallback_fonts:
+                if os.path.exists(fallback):
+                    font_path = fallback
+                    logger.debug(f"Using fallback system font: {font_path}")
+                    break
     
     # Create temp file for output
     temp_dir = tempfile.gettempdir()
