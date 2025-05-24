@@ -469,8 +469,8 @@ class EmbyClient(MediaServerClient):
             
             # First, get the collection details (we'll need this in multiple steps)
             try:
-                # Use uppercase /Items/ for getting item information as confirmed working
-                collection_endpoint = f"/Items/{collection_id}?api_key={self.api_key}"
+                # BoxSets (collections) need to be accessed through the Collections endpoint
+                collection_endpoint = f"/Collections/{collection_id}?api_key={self.api_key}"
                 collection_data = self._make_api_request('GET', collection_endpoint)
             except Exception as e:
                 logger.error(f"Error fetching collection data: {e}")
@@ -506,7 +506,7 @@ class EmbyClient(MediaServerClient):
                 try:
                     # Make sure we have collection data with name
                     if not collection_data or 'Name' not in collection_data:
-                        collection_endpoint = f"/Items/{collection_id}?api_key={self.api_key}"
+                        collection_endpoint = f"/Collections/{collection_id}?api_key={self.api_key}"
                         collection_data = self._make_api_request('GET', collection_endpoint)
                     
                     if collection_data and 'Name' in collection_data:
