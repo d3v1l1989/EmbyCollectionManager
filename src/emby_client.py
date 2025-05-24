@@ -469,7 +469,7 @@ class EmbyClient(MediaServerClient):
             
             # First, get the collection details (we'll need this in multiple steps)
             try:
-                collection_endpoint = f"/Items/{collection_id}?api_key={self.api_key}"
+                collection_endpoint = f"/items/{collection_id}?api_key={self.api_key}"
                 collection_data = self._make_api_request('GET', collection_endpoint)
             except Exception as e:
                 logger.error(f"Error fetching collection data: {e}")
@@ -483,7 +483,7 @@ class EmbyClient(MediaServerClient):
                     if tmdb_id:
                         logger.info(f"Found TMDb collection ID: {tmdb_id}")
                         # Use remote images endpoint to get available images for the collection
-                        remote_images_endpoint = f"/Items/{collection_id}/RemoteImages?api_key={self.api_key}"
+                        remote_images_endpoint = f"/items/{collection_id}/RemoteImages?api_key={self.api_key}"
                         remote_images_data = self._make_api_request('GET', remote_images_endpoint)
                         
                         # Look for collection poster in remote images
@@ -505,7 +505,7 @@ class EmbyClient(MediaServerClient):
                 try:
                     # Make sure we have collection data with name
                     if not collection_data or 'Name' not in collection_data:
-                        collection_endpoint = f"/Items/{collection_id}?api_key={self.api_key}"
+                        collection_endpoint = f"/items/{collection_id}?api_key={self.api_key}"
                         collection_data = self._make_api_request('GET', collection_endpoint)
                     
                     if collection_data and 'Name' in collection_data:
@@ -544,7 +544,7 @@ class EmbyClient(MediaServerClient):
                 try:
                     logger.info("Falling back to first movie poster in the collection")
                     # Get items in the collection
-                    collection_items_endpoint = f"/Items?ParentId={collection_id}&api_key={self.api_key}"
+                    collection_items_endpoint = f"/items?ParentId={collection_id}&api_key={self.api_key}"
                     items_data = self._make_api_request('GET', collection_items_endpoint)
                     
                     if items_data and 'Items' in items_data and items_data['Items']:
@@ -553,7 +553,7 @@ class EmbyClient(MediaServerClient):
                         
                         if first_item_id:
                             # Get remote images for the first item
-                            item_images_endpoint = f"/Items/{first_item_id}/RemoteImages?api_key={self.api_key}"
+                            item_images_endpoint = f"/items/{first_item_id}/RemoteImages?api_key={self.api_key}"
                             item_images_data = self._make_api_request('GET', item_images_endpoint)
                             
                             if item_images_data and 'Images' in item_images_data:
@@ -577,134 +577,56 @@ class EmbyClient(MediaServerClient):
                 except Exception as e:
                     logger.error(f"Error trying to fetch first movie poster: {e}")
         
-        # Update poster if available
+        # Update poster if available - using direct binary upload like Posterizarr
         if poster_url:
             logger.info(f"Attempting to set poster for {collection_id} with URL: {poster_url}")
             try:
-                url = f"{self.server_url}/Items/{collection_id}/RemoteImages/Download?api_key={self.api_key}"
-                payload = {
-                    "Type": "Primary",
-                    "ImageUrl": poster_url,
-                    "ProviderName": "TMDb"
-                }
-                logger.info(f"Updating poster for collection {collection_id}")
-                response = self.session.post(url, json=payload, timeout=15)
-                if response.status_code in [200, 204]:
-                    success = True
-                    logger.info(f"Poster update successful (status: {response.status_code})")
-                else:
-                    logger.error(f"Failed to update poster (status: {response.status_code}) - {response.text}")
+                # Using the Posterizarr approach - direct binary upload
+                url = f"{self.server_url}/items/{collection_id}/images/Primary?api_key={self.api_key}"
+                logger.info(f"Updating poster for collection {collection_id} using direct upload")
+                
+                # Download image from URL first
+                try:
+                    image_response = requests.get(poster_url, timeout=15)
+                    image_response.raise_for_status()
+                    image_data = image_response.content
+                    
+                    # Then upload the binary data directly
+                    response = self.session.post(url, data=image_data, timeout=15)
+                    if response.status_code in [200, 204]:
+                        success = True
+                        logger.info(f"Poster update successful (status: {response.status_code})")
+                    else:
+                        logger.error(f"Failed to update poster (status: {response.status_code}) - {response.text}")
+                except requests.RequestException as e:
+                    logger.error(f"Error downloading/uploading image from URL {poster_url}: {e}")
             except Exception as e:
                 logger.error(f"Error updating collection poster: {e}")
             
-        # Update backdrop if provided
+        # Update backdrop if provided - using direct binary upload like Posterizarr
         if backdrop_url:
             logger.info(f"Attempting to set backdrop for {collection_id} with URL: {backdrop_url}")
             try:
-                url = f"{self.server_url}/Items/{collection_id}/RemoteImages/Download?api_key={self.api_key}"
-                payload = {
-                    "Type": "Backdrop",
-                    "ImageUrl": backdrop_url,
-                    "ProviderName": "TMDb"
-                }
-                logger.info(f"Updating backdrop for collection {collection_id}")
-                response = self.session.post(url, json=payload, timeout=15)
-                if response.status_code in [200, 204]:
-                    success = True
-                    logger.info(f"Backdrop update successful (status: {response.status_code})")
-                else:
-                    logger.error(f"Failed to update backdrop (status: {response.status_code}) - {response.text}")
+                # Using the Posterizarr approach - direct binary upload
+                url = f"{self.server_url}/items/{collection_id}/images/Backdrop?api_key={self.api_key}"
+                logger.info(f"Updating backdrop for collection {collection_id} using direct upload")
+                
+                # Download image from URL first
+                try:
+                    image_response = requests.get(backdrop_url, timeout=15)
+                    image_response.raise_for_status()
+                    image_data = image_response.content
+                    
+                    # Then upload the binary data directly
+                    response = self.session.post(url, data=image_data, timeout=15)
+                    if response.status_code in [200, 204]:
+                        success = True
+                        logger.info(f"Backdrop update successful (status: {response.status_code})")
+                    else:
+                        logger.error(f"Failed to update backdrop (status: {response.status_code}) - {response.text}")
+                except requests.RequestException as e:
+                    logger.error(f"Error downloading/uploading image from URL {backdrop_url}: {e}")
             except Exception as e:
                 logger.error(f"Error updating collection backdrop: {e}")
             
         return success
-
-    def get_all_collections_sorted_by_year(self) -> List[Dict[str, Any]]:
-        """
-        Get all collections (BoxSets) from the Emby server, sorted by PremiereDate (ascending).
-
-        Returns:
-            List of collection items (dictionaries) or an empty list if an error occurs or no collections are found.
-        """
-        logger.info("Fetching all collections sorted by year...")
-        params = {
-            'IncludeItemTypes': 'BoxSet',
-            'Recursive': 'true',
-            'Fields': 'Name,PremiereDate,ProductionYear,SortName', # Requesting relevant fields
-            'SortBy': 'PremiereDate', # Sorting by premiere date
-            'SortOrder': 'Descending',
-            # 'Limit': 1000 # Optional: Add a limit if there's a very large number of collections
-        }
-        endpoint = f"/Users/{self.user_id}/Items"
-        
-        data = self._make_api_request('GET', endpoint, params=params)
-        
-        if data and 'Items' in data:
-            collections = data['Items']
-            logger.info(f"Successfully fetched {len(collections)} collections sorted by year.")
-            return collections
-        else:
-            logger.warning("No collections found or an error occurred while fetching collections.")
-            return []
-
-    def _make_api_request(self, method: str, endpoint: str, params: Optional[Dict[str, Any]] = None,
-                          json_data: Optional[Dict[str, Any]] = None, **kwargs) -> Optional[Dict[str, Any]]:
-        """
-        Internal helper to make API requests.
-        
-        Args:
-            method: HTTP method (GET, POST, etc.)
-            endpoint: API endpoint (e.g., "/Users/{user_id}/Items")
-            params: Optional query parameters
-            json_data: Optional JSON payload for POST/PUT requests
-            **kwargs: Additional keyword arguments to pass to the request
-            
-        Returns:
-            JSON response data or None if error/no content
-        """
-        # Call the parent class implementation which handles common functionality
-        # This implementation adds a few Emby-specific enhancements
-        
-        # Make sure we have a session with proper headers
-        if not hasattr(self, 'session'):
-            self.session = requests.Session()
-            self.session.headers.update({
-                'X-Emby-Token': self.api_key,
-                'Accept': 'application/json'
-            })
-        
-        # Ensure API key is included in requests
-        current_params = params.copy() if params else {}
-        if 'api_key' not in current_params and 'api_key=' not in endpoint and not endpoint.lower().startswith('http'):
-            current_params['api_key'] = self.api_key
-            
-        try:
-            url = f"{self.server_url}{endpoint}" if not endpoint.lower().startswith('http') else endpoint
-            response = self.session.request(method, url, params=current_params, json=json_data, timeout=30, **kwargs)
-            response.raise_for_status()
-            
-            # Handle 204 No Content responses (successful but no body)
-            if response.status_code == 204:
-                return None
-                
-            return response.json()
-            
-        except requests.exceptions.JSONDecodeError as e:
-            logger.error(f"API response is not valid JSON: {e}")
-            if 'response' in locals():
-                logger.error(f"Response text: {response.text[:200]}")
-            return None
-            
-        except requests.exceptions.HTTPError as e:
-            logger.error(f"API request failed with HTTP error: {e}")
-            logger.error(f"Request URL: {endpoint}")
-            logger.error(f"Request method: {method}")
-            logger.error(f"Request params: {params}")
-            logger.error(f"Request JSON: {json_data}")
-            if hasattr(e, 'response') and hasattr(e.response, 'text'):
-                logger.error(f"Response text: {e.response.text[:200]}")
-            return None
-            
-        except requests.RequestException as e:
-            logger.error(f"API request failed: {e}")
-            return None
