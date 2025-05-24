@@ -591,8 +591,12 @@ class EmbyClient(MediaServerClient):
                     image_response.raise_for_status()
                     image_data = image_response.content
                     
-                    # Then upload the binary data directly
-                    response = self.session.post(url, data=image_data, timeout=15)
+                    # Convert image data to Base64 string (this is what Emby expects)
+                    import base64
+                    image_data_base64 = base64.b64encode(image_data).decode('utf-8')
+                    
+                    # Then upload the Base64 encoded data
+                    response = self.session.post(url, data=image_data_base64, timeout=15)
                     if response.status_code in [200, 204]:
                         success = True
                         logger.info(f"Poster update successful (status: {response.status_code})")
@@ -617,8 +621,12 @@ class EmbyClient(MediaServerClient):
                     image_response.raise_for_status()
                     image_data = image_response.content
                     
-                    # Then upload the binary data directly
-                    response = self.session.post(url, data=image_data, timeout=15)
+                    # Convert image data to Base64 string (this is what Emby expects)
+                    import base64
+                    image_data_base64 = base64.b64encode(image_data).decode('utf-8')
+                    
+                    # Then upload the Base64 encoded data
+                    response = self.session.post(url, data=image_data_base64, timeout=15)
                     if response.status_code in [200, 204]:
                         success = True
                         logger.info(f"Backdrop update successful (status: {response.status_code})")
