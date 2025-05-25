@@ -94,13 +94,32 @@ def generate_custom_poster(
             # Fallback to default even if it might not exist
             resources_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
     
-    # Log the template selection process
+    # Log the template selection process with full details
     if template_name:
-        logger.info(f"Using specified template: {template_name}")
+        logger.info(f"[DOCKER DEBUG] Using specified template: {template_name}")
     else:
-        logger.info(f"No template specified, using default: {DEFAULT_TEMPLATE}")
+        logger.info(f"[DOCKER DEBUG] No template specified, using default: {DEFAULT_TEMPLATE}")
+    
+    # Log all possible resource paths for debugging
+    logger.info(f"[DOCKER DEBUG] Resources directory being used: {resources_dir}")
+    logger.info(f"[DOCKER DEBUG] Current working directory: {os.getcwd()}")
+    
+    # Try to list all templates in the directory to verify access
+    templates_dir = os.path.join(resources_dir, "templates")
+    if os.path.exists(templates_dir):
+        try:
+            all_templates = os.listdir(templates_dir)
+            logger.info(f"[DOCKER DEBUG] Available templates: {all_templates}")
+        except Exception as e:
+            logger.error(f"[DOCKER DEBUG] Error listing templates: {e}")
+    else:
+        logger.error(f"[DOCKER DEBUG] Templates directory not found: {templates_dir}")
     
     template_path = os.path.join(resources_dir, "templates", template_name or DEFAULT_TEMPLATE)
+    logger.info(f"[DOCKER DEBUG] Full template path: {template_path}")
+    logger.info(f"[DOCKER DEBUG] Template file exists: {os.path.exists(template_path)}")
+    if not os.path.exists(template_path):
+        logger.error(f"[DOCKER DEBUG] Template file not found at: {template_path}")
     
     # Check if template exists
     if not os.path.exists(template_path):

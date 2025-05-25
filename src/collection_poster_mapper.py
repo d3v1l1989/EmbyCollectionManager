@@ -117,6 +117,36 @@ def find_collection_category(collection_name: str, recipes_file_path: str) -> Op
     Returns:
         Category number or None if not found
     """
+    logger.info(f"[DOCKER DEBUG] Finding category for collection: '{collection_name}'")
+    logger.info(f"[DOCKER DEBUG] Using recipes file: {recipes_file_path}")
+    
+    # First try to load category directly from CATEGORY_CONFIG
+    try:
+        category_config = load_category_config(recipes_file_path)
+        if category_config:
+            logger.info(f"[DOCKER DEBUG] Loaded {len(category_config)} categories from CATEGORY_CONFIG")
+            
+            # Try a direct import of collection_recipes to check collections
+            try:
+                from src.collection_recipes import COLLECTION_RECIPES
+                
+                # Log collections we're looking for
+                collection_names = [recipe.get("name") for recipe in COLLECTION_RECIPES if recipe.get("name")]
+                logger.info(f"[DOCKER DEBUG] Found {len(collection_names)} collection names in COLLECTION_RECIPES")
+                logger.info(f"[DOCKER DEBUG] Is our collection in the list? {collection_name in collection_names}")
+                
+                if collection_name in collection_names:
+                    # Try to find it manually by checking adjacent collections
+                    for i, recipe in enumerate(COLLECTION_RECIPES):
+                        if recipe.get("name") == collection_name:
+                            # Look at recipes before this one to find the last category header
+                            for j in range(i, 0, -1):
+                                prev_recipe = COLLECTION_RECIPES[j-1]
+                                logger.info(f"[DOCKER DEBUG] Checking previous recipe: {prev_recipe.get('name')}")
+            except Exception as e:
+                logger.error(f"[DOCKER DEBUG] Error directly importing COLLECTION_RECIPES: {e}")
+    except Exception as e:
+        logger.error(f"[DOCKER DEBUG] Error loading CATEGORY_CONFIG: {e}")
     try:
         with open(recipes_file_path, 'r', encoding='utf-8') as file:
             content = file.read()
@@ -169,6 +199,11 @@ def get_poster_template_for_collection(
     Returns:
         Poster template filename or None if not applicable/found
     """
+    # Add Docker-specific debug logging
+    logger.info(f"[DOCKER DEBUG] Finding poster template for collection: '{collection_name}'")
+    logger.info(f"[DOCKER DEBUG] Category map has {len(category_poster_map)} categories: {list(category_poster_map.keys())}")
+    logger.info(f"[DOCKER DEBUG] Recipes file path: {recipes_file_path}")
+    logger.info(f"[DOCKER DEBUG] Current working directory: {os.getcwd()}")
     # Find which category this collection belongs to
     category_number = find_collection_category(collection_name, recipes_file_path)
     if not category_number:
