@@ -413,8 +413,8 @@ class EmbyClient(MediaServerClient):
         Update artwork for an Emby collection using external image URLs.
         Order of poster selection:
         1. Use provided poster_url if any
-        2. Try to fetch collection poster from TMDb
-        3. Generate custom poster if enabled
+        2. If it's a franchise collection (based on category_id), try to fetch from TMDb
+        3. For non-franchise collections, generate a custom poster based on category_id
         4. Fall back to first movie's poster as last resort
         
         Args:
@@ -478,13 +478,84 @@ class EmbyClient(MediaServerClient):
                 logger.error(f"Error fetching collection data: {e}")
                 collection_data = None
                 
-            # STEP 1: Try to fetch TMDb collection poster if available
-            if collection_data and 'ProviderIds' in collection_data:
+            # First, determine the collection's category_id and check if it's a franchise collection
+            collection_name = None
+            category_id = None
+            is_franchise = False
+            template_name = None
+            
+            # Make sure we have collection data with name
+            if not collection_data or 'Name' not in collection_data:
+                collection_endpoint = f"/Users/{self.user_id}/Items/{collection_id}?api_key={self.api_key}"
+                collection_data = self._make_api_request('GET', collection_endpoint)
+                
+            if collection_data and 'Name' in collection_data:
+                collection_name = collection_data['Name']
+                logger.info(f"Processing collection: '{collection_name}'")
+                
+                # Look up category_id for this collection from collection_recipes.py
+                try:
+                    # Get the path to collection_recipes.py
+                    if hasattr(self, 'config') and 'script_dir' in self.config:
+                        script_dir = self.config['script_dir']
+                    else:
+                        # Default to a relative path from current directory
+                        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                        
+                    recipes_file_path = os.path.join(script_dir, 'src', 'collection_recipes.py')
+                    
+                    # First try to import directly
+                    if script_dir not in sys.path:
+                        sys.path.append(script_dir)
+                        
+                    try:
+                        from src.collection_recipes import COLLECTION_RECIPES
+                        
+                        # Find this collection in the COLLECTION_RECIPES list
+                        for recipe in COLLECTION_RECIPES:
+                            if recipe.get('name') == collection_name and 'category_id' in recipe:
+                                category_id = recipe['category_id']
+                                logger.info(f"Found category_id {category_id} for collection '{collection_name}'")
+                                break
+                    except (ImportError, ModuleNotFoundError) as e:
+                        logger.warning(f"Could not import COLLECTION_RECIPES directly: {e}")
+                    
+                    # If we found a category_id, check if it's a franchise collection
+                    if category_id is not None:
+                        # Load the category config mapping
+                        try:
+                            from src.collection_poster_mapper import load_category_config, is_franchise_collection
+                            
+                            category_map = load_category_config(recipes_file_path)
+                            
+                            # Check if this is a franchise collection
+                            is_franchise = is_franchise_collection(category_id, category_map)
+                            logger.info(f"Collection '{collection_name}' franchise status: {is_franchise} (category_id: {category_id})")
+                            
+                            # Get template name if not a franchise collection
+                            if not is_franchise:
+                                from src.collection_poster_mapper import get_poster_template_for_collection
+                                template_name = get_poster_template_for_collection(
+                                    collection_name=collection_name,
+                                    category_poster_map=category_map,
+                                    recipes_file_path=recipes_file_path,
+                                    category_id=category_id
+                                )
+                                logger.info(f"Using template '{template_name}' for collection '{collection_name}' (category {category_id})")
+                        except Exception as e:
+                            logger.error(f"Error determining franchise status: {e}")
+                except Exception as e:
+                    logger.error(f"Error finding category_id for collection '{collection_name}': {e}")
+            else:
+                logger.warning("Could not determine collection name for poster selection")
+            
+            # STEP 1: For franchise collections, try to fetch poster from TMDb
+            if is_franchise and not poster_url and collection_data and 'ProviderIds' in collection_data:
                 try:
                     tmdb_id = collection_data['ProviderIds'].get('Tmdb')
                     
                     if tmdb_id:
-                        logger.info(f"Found TMDb collection ID: {tmdb_id}")
+                        logger.info(f"Fetching poster from TMDb for franchise collection '{collection_name}' (ID: {tmdb_id})")
                         # Use uppercase /Items/ for remote images as confirmed working
                         remote_images_endpoint = f"/Items/{collection_id}/RemoteImages?api_key={self.api_key}"
                         remote_images_data = self._make_api_request('GET', remote_images_endpoint)
@@ -500,80 +571,31 @@ class EmbyClient(MediaServerClient):
                                 collection_posters.sort(key=lambda x: x.get('CommunityRating', 0), reverse=True)
                                 poster_url = collection_posters[0].get('Url')
                                 logger.info(f"Found collection poster from TMDb: {poster_url}")
+                            else:
+                                logger.info(f"No suitable TMDb posters found for franchise collection '{collection_name}'")
+                        else:
+                            logger.info(f"No remote images available for franchise collection '{collection_name}'")
+                    else:
+                        logger.info(f"No TMDb ID found for franchise collection '{collection_name}'")
                 except Exception as e:
                     logger.error(f"Error fetching TMDb poster: {e}")
             
-            # STEP 2: If no TMDb poster, try generating a custom poster if enabled
-            if not poster_url and hasattr(self, 'config') and self.config.get('poster_settings', {}).get('enable_custom_posters', True):
+            # STEP 2: For non-franchise collections, generate a custom poster if enabled
+            if not poster_url and not is_franchise and hasattr(self, 'config') and self.config.get('poster_settings', {}).get('enable_custom_posters', True):
                 try:
-                    # Make sure we have collection data with name
-                    if not collection_data or 'Name' not in collection_data:
-                        collection_endpoint = f"/Users/{self.user_id}/Items/{collection_id}?api_key={self.api_key}"
-                        collection_data = self._make_api_request('GET', collection_endpoint)
-                    
-                    if collection_data and 'Name' in collection_data:
-                        collection_name = collection_data['Name']
-                        
+                    if collection_name:
                         # Get poster settings from config
                         poster_settings = self.config.get('poster_settings', {})
                         text_color = poster_settings.get('text_color')
                         text_position = poster_settings.get('text_position')
                         
-                        # Look up category_id for this collection name from collection_recipes.py
-                        category_id = None
-                        template_name = None
-                        
-                        try:
-                            # Get the path to collection_recipes.py
-                            if hasattr(self, 'config') and 'script_dir' in self.config:
-                                script_dir = self.config['script_dir']
-                            else:
-                                # Default to a relative path from current directory
-                                script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                                
-                            recipes_file_path = os.path.join(script_dir, 'src', 'collection_recipes.py')
-                            
-                            # First try to import directly
-                            if script_dir not in sys.path:
-                                sys.path.append(script_dir)
-                                
-                            try:
-                                from src.collection_recipes import COLLECTION_RECIPES
-                                
-                                # Find this collection in the COLLECTION_RECIPES list
-                                for recipe in COLLECTION_RECIPES:
-                                    if recipe.get('name') == collection_name and 'category_id' in recipe:
-                                        category_id = recipe['category_id']
-                                        logger.info(f"Found category_id {category_id} for collection '{collection_name}'")
-                                        break
-                            except (ImportError, ModuleNotFoundError):
-                                logger.warning(f"Could not import COLLECTION_RECIPES directly")
-                            
-                            # If we found a category_id, use it to get the appropriate template
-                            if category_id is not None:
-                                # Load the category config mapping
-                                category_map = load_category_config(recipes_file_path)
-                                
-                                # Get the template name for this category
-                                template_name = get_poster_template_for_collection(
-                                    collection_name=collection_name,
-                                    category_poster_map=category_map,
-                                    recipes_file_path=recipes_file_path,
-                                    category_id=category_id
-                                )
-                                logger.info(f"Using template '{template_name}' for collection '{collection_name}' (category {category_id})")
-                        except Exception as e:
-                            logger.error(f"Error finding category_id for collection '{collection_name}': {e}")
-                            # Fall back to the template from config if category lookup fails
-                            template_name = poster_settings.get('template_name')
-                        
-                        # If we still don't have a template_name, use the one from config
+                        # If we still don't have a template_name from category lookup, use default from config
                         if template_name is None:
                             template_name = poster_settings.get('template_name')
                             logger.info(f"Using default template '{template_name}' from config for collection '{collection_name}'")
                         
                         # Generate custom poster with the determined template
-                        logger.info(f"Attempting to generate custom poster for collection '{collection_name}'")
+                        logger.info(f"Generating custom poster for non-franchise collection '{collection_name}'")
                         custom_poster_path = generate_custom_poster(
                             collection_name,
                             template_name=template_name,
