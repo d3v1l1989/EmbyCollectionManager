@@ -94,12 +94,28 @@ def generate_custom_poster(
             # Fallback to default even if it might not exist
             resources_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
     
+    # Log the template selection process
+    if template_name:
+        logger.info(f"Using specified template: {template_name}")
+    else:
+        logger.info(f"No template specified, using default: {DEFAULT_TEMPLATE}")
+    
     template_path = os.path.join(resources_dir, "templates", template_name or DEFAULT_TEMPLATE)
     
     # Check if template exists
     if not os.path.exists(template_path):
         logger.error(f"Template image not found: {template_path}")
-        return None
+        if template_name and template_name != DEFAULT_TEMPLATE:
+            # Try fallback to default template
+            logger.warning(f"Falling back to default template: {DEFAULT_TEMPLATE}")
+            fallback_path = os.path.join(resources_dir, "templates", DEFAULT_TEMPLATE)
+            if os.path.exists(fallback_path):
+                template_path = fallback_path
+            else:
+                logger.error(f"Default template also not found: {fallback_path}")
+                return None
+        else:
+            return None
         
     # Set up font path
     if font_path is None:

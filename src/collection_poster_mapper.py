@@ -123,7 +123,7 @@ def find_collection_category(collection_name: str, recipes_file_path: str) -> Op
             
             # Find the collection in the file
             # Handle both formats: {'name': 'Collection Name', ...} and {"name": "Collection Name", ...}
-            collection_pattern = re.compile(r'{\s*[\'"]name[\'"]s*:\s*[\'"]' + re.escape(collection_name) + r'[\'"]')
+            collection_pattern = re.compile(r'{\s*[\'"]name[\'"]\s*:\s*[\'"]' + re.escape(collection_name) + r'[\'"]')
             collection_match = collection_pattern.search(content)
             
             if not collection_match:

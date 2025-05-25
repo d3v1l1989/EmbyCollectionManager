@@ -12,6 +12,7 @@ test*.py
 src/testnames.py
 src/testrecipes.py
 test_poster_generator.py
+debug_poster_selection.py
 
 # Collection generators (except collection_recipes.py)
 src/artist_collections.py
