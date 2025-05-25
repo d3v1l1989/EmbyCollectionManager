@@ -57,7 +57,7 @@ poster_settings:
   # Text settings
   text_color: [255, 255, 255]  # RGB values for text color (white)
   bg_color: [0, 0, 0, 128]     # RGBA values for text background (semi-transparent black)
-  text_position: 0.8           # Vertical position of text (0-1), 0.8 = 80% from top
+  text_position: 0.5           # Vertical position of text (0-1), 0.8 = 80% from top
 ```
 
 
