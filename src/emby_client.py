@@ -3,11 +3,13 @@ import uuid
 import logging
 import requests
 import os
+import sys
 from typing import List, Dict, Any, Optional
 from urllib.parse import quote
 
 from .base_media_server_client import MediaServerClient
 from .poster_generator import generate_custom_poster, file_to_url
+from .collection_poster_mapper import get_poster_template_for_collection, load_category_config
 
 logger = logging.getLogger(__name__)
 
@@ -514,11 +516,63 @@ class EmbyClient(MediaServerClient):
                         
                         # Get poster settings from config
                         poster_settings = self.config.get('poster_settings', {})
-                        template_name = poster_settings.get('template_name')
                         text_color = poster_settings.get('text_color')
                         text_position = poster_settings.get('text_position')
                         
-                        # Generate custom poster with configured settings
+                        # Look up category_id for this collection name from collection_recipes.py
+                        category_id = None
+                        template_name = None
+                        
+                        try:
+                            # Get the path to collection_recipes.py
+                            if hasattr(self, 'config') and 'script_dir' in self.config:
+                                script_dir = self.config['script_dir']
+                            else:
+                                # Default to a relative path from current directory
+                                script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                                
+                            recipes_file_path = os.path.join(script_dir, 'src', 'collection_recipes.py')
+                            
+                            # First try to import directly
+                            if script_dir not in sys.path:
+                                sys.path.append(script_dir)
+                                
+                            try:
+                                from src.collection_recipes import COLLECTION_RECIPES
+                                
+                                # Find this collection in the COLLECTION_RECIPES list
+                                for recipe in COLLECTION_RECIPES:
+                                    if recipe.get('name') == collection_name and 'category_id' in recipe:
+                                        category_id = recipe['category_id']
+                                        logger.info(f"Found category_id {category_id} for collection '{collection_name}'")
+                                        break
+                            except (ImportError, ModuleNotFoundError):
+                                logger.warning(f"Could not import COLLECTION_RECIPES directly")
+                            
+                            # If we found a category_id, use it to get the appropriate template
+                            if category_id is not None:
+                                # Load the category config mapping
+                                category_map = load_category_config(recipes_file_path)
+                                
+                                # Get the template name for this category
+                                template_name = get_poster_template_for_collection(
+                                    collection_name=collection_name,
+                                    category_poster_map=category_map,
+                                    recipes_file_path=recipes_file_path,
+                                    category_id=category_id
+                                )
+                                logger.info(f"Using template '{template_name}' for collection '{collection_name}' (category {category_id})")
+                        except Exception as e:
+                            logger.error(f"Error finding category_id for collection '{collection_name}': {e}")
+                            # Fall back to the template from config if category lookup fails
+                            template_name = poster_settings.get('template_name')
+                        
+                        # If we still don't have a template_name, use the one from config
+                        if template_name is None:
+                            template_name = poster_settings.get('template_name')
+                            logger.info(f"Using default template '{template_name}' from config for collection '{collection_name}'")
+                        
+                        # Generate custom poster with the determined template
                         logger.info(f"Attempting to generate custom poster for collection '{collection_name}'")
                         custom_poster_path = generate_custom_poster(
                             collection_name,
