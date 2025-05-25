@@ -14,6 +14,9 @@ src/testrecipes.py
 test_poster_generator.py
 debug_poster_selection.py
 
+# Include diagnostic scripts
+!docker_test_resources.py
+
 # Collection generators (except collection_recipes.py)
 src/artist_collections.py
 src/studio_collections.py

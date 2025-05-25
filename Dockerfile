@@ -17,6 +17,7 @@ COPY src/ ./src/
 COPY main.py ./
 COPY config/ ./config/
 COPY resources/ ./resources/
+COPY docker_test_resources.py ./
 
 # Expose config volume for mounting secrets/configs
 VOLUME ["/app/config"]
