@@ -14,7 +14,6 @@ import tempfile
 from src.poster_generator import generate_custom_poster, cleanup_temp_posters, file_to_url
 from src.collection_poster_mapper import (
     parse_collection_categories,
-    find_collection_category,
     get_poster_template_for_collection,
     check_poster_template_exists,
     is_franchise_collection
@@ -27,7 +26,8 @@ def generate_poster_for_collection(
     collection_name: str,
     recipes_file_path: str,
     resources_dir: str,
-    category_poster_map: Optional[Dict[int, Dict[str, str]]] = None
+    category_poster_map: Optional[Dict[int, Dict[str, str]]] = None,
+    category_id: Optional[int] = None
 ) -> Optional[str]:
     """
     Generate a custom poster for a collection based on its category.
@@ -37,6 +37,7 @@ def generate_poster_for_collection(
         recipes_file_path: Path to the collection_recipes.py file
         resources_dir: Path to the resources directory
         category_poster_map: Optional pre-extracted categories with poster mappings
+        category_id: Optional direct category ID from the collection recipe
         
     Returns:
         Path to the generated poster file or None if generation failed/not applicable
@@ -45,30 +46,37 @@ def generate_poster_for_collection(
     if category_poster_map is None:
         category_poster_map = parse_collection_categories(recipes_file_path)
     
-    # Get the category number for this collection - will be used throughout the function
-    category_number = find_collection_category(collection_name, recipes_file_path)
-    logger.info(f"Collection '{collection_name}' belongs to category {category_number if category_number else 'unknown'}")
+    # Use provided category_id if available, otherwise find from file
+    if category_id is not None:
+        category_number = category_id
+        logger.info(f"Using provided category_id {category_id} for collection '{collection_name}'")
+    else:
+        category_number = find_collection_category(collection_name, recipes_file_path)
+        logger.info(f"Collection '{collection_name}' belongs to category {category_number if category_number else 'unknown'}")
     
     # Skip poster generation for franchise collections (they use TMDb posters)
     if category_number and is_franchise_collection(category_number, category_poster_map):
         logger.info(f"Skipping poster generation for franchise collection '{collection_name}'")
         return None
     
-    # Add Docker-specific debugging for collection category
-    logger.info(f"[DOCKER DEBUG] Generate poster for collection: '{collection_name}'")
-    logger.info(f"[DOCKER DEBUG] Recipes file path: {recipes_file_path}")
-    logger.info(f"[DOCKER DEBUG] Resources directory: {resources_dir}")
-    logger.info(f"[DOCKER DEBUG] Category map has {len(category_poster_map) if category_poster_map else 0} entries")
+    # Add logging for collection poster generation
+    logger.info(f"Generating poster for collection: '{collection_name}'")
+    logger.info(f"Resources directory: {resources_dir}")
+    logger.info(f"Category map has {len(category_poster_map) if category_poster_map else 0} entries")
     
-    # Get the category number for logging purposes
-    category_number = find_collection_category(collection_name, recipes_file_path)
-    logger.info(f"[DOCKER DEBUG] Found category number: {category_number}")
+    # Log the category ID we're using
+    logger.info(f"Using category_id: {category_id}")
     
-    if category_number and category_number in category_poster_map:
-        logger.info(f"[DOCKER DEBUG] Category {category_number} maps to: {category_poster_map[category_number]}")
+    if category_id and category_id in category_poster_map:
+        logger.info(f"Category {category_id} maps to: {category_poster_map[category_id]}")
     
     # Get the appropriate template for this collection
-    template_name = get_poster_template_for_collection(collection_name, category_poster_map, recipes_file_path)
+    template_name = get_poster_template_for_collection(
+        collection_name=collection_name, 
+        category_poster_map=category_poster_map, 
+        recipes_file_path=recipes_file_path,
+        category_id=category_number
+    )
     logger.info(f"[DOCKER DEBUG] Template name from mapper: {template_name}")
     
     # IMPORTANT FIX: Don't return None if no template found, let the poster generator use default
@@ -142,12 +150,16 @@ def generate_posters_for_all_collections(
         collection_name = recipe.get("name")
         if not collection_name:
             continue
+            
+        # Extract category_id directly from the recipe if available
+        category_id = recipe.get("category_id")
         
         poster_path = generate_poster_for_collection(
             collection_name=collection_name,
             recipes_file_path=recipes_file_path,
             resources_dir=resources_dir,
-            category_poster_map=category_poster_map
+            category_poster_map=category_poster_map,
+            category_id=category_id
         )
         
         if poster_path:

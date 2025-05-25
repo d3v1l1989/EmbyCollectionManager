@@ -56,21 +56,6 @@ def generate_custom_poster(
     Returns:
         Path to generated poster image file or None if generation failed
     """
-    # DIRECT FIX: Override template selection for specific collections
-    # This ensures Docker environment uses the correct templates
-    collection_template_override = {
-        "Popular Movies on TMDb": "tmdb.jpg",
-        "Trending Movies on TMDb": "tmdb.jpg",
-        "Top Rated Movies on TMDb": "tmdb.jpg",
-        "Now Playing in Theaters": "tmdb.jpg",
-        "Upcoming Movies": "tmdb.jpg"
-    }
-    
-    # If this collection has an override, use it regardless of what was passed in
-    if collection_name in collection_template_override:
-        override_template = collection_template_override[collection_name]
-        logger.info(f"[DOCKER OVERRIDE] Using override template '{override_template}' for collection '{collection_name}'")
-        template_name = override_template
     
     # Handle default values and type conversions for parameters
     if text_color is None:
@@ -370,16 +355,7 @@ def generate_custom_poster(
                     
                 line_y = start_y + i * (text_height + line_spacing)
                 
-                # Draw text shadow/outline for contrast without background
-                shadow_color = (0, 0, 0, 180)  # Semi-transparent black for shadow
-                
-                # Draw shadow in multiple directions for an outline effect
-                # Use a smaller set of offsets to reduce shadow size
-                for dx, dy in [(-1,0), (0,-1), (0,1), (1,0)]:
-                    shadow_pos = (line_x + dx*shadow_offset, line_y + dy*shadow_offset)
-                    draw.text(shadow_pos, line, font=font, fill=shadow_color)
-                    
-                # Draw the actual text on top
+                # Draw the text with no shadow/outline for a cleaner look
                 draw.text((line_x, line_y), line, font=font, fill=text_color)
         else:
             # Draw single line text with shadow for better readability
@@ -458,11 +434,7 @@ def generate_custom_poster(
                         
                         line_y = start_y + i * (text_height + 20)
                         
-                        # Draw shadow
-                        shadow_color = (0, 0, 0, 180)
-                        for dx, dy in [(-1,0), (0,-1), (0,1), (1,0)]:
-                            shadow_pos = (line_x + dx*shadow_offset, line_y + dy*shadow_offset)
-                            draw.text(shadow_pos, line, font=font, fill=shadow_color)
+                        # No shadow effect for cleaner text rendering
                         
                         # Draw text
                         draw.text((line_x, line_y), line, font=font, fill=text_color)
@@ -475,15 +447,7 @@ def generate_custom_poster(
             adjusted_y_position = (h * text_position) - (text_height / 2)
             position = (x_position, adjusted_y_position)
             
-            # Draw text shadow/outline for contrast without background
-            shadow_color = (0, 0, 0, 180)  # Semi-transparent black for shadow
-            
-            # Draw shadow in multiple directions (reduced set for cleaner look)
-            for dx, dy in [(-1,0), (0,-1), (0,1), (1,0)]:
-                shadow_pos = (position[0] + dx*shadow_offset, position[1] + dy*shadow_offset)
-                draw.text(shadow_pos, collection_name, font=font, fill=shadow_color)
-                
-            # Draw the actual text on top
+            # Draw text with no shadow/outline for a cleaner look
             draw.text(position, collection_name, font=font, fill=text_color)
         
         # Save to temp location
