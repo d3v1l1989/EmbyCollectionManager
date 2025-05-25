@@ -3,9 +3,24 @@ from typing import List, Dict, Any
 # This file contains categorized collection recipes for the TMDbCollector application
 # Recipes are organized by category for easier maintenance and readability
 
+# Configuration section mapping category numbers to their properties
+CATEGORY_CONFIG = {
+    1: {"name": "TMDb GENERAL COLLECTIONS", "poster": "tmdb.jpg"},
+    2: {"name": "STREAMING PLATFORM COLLECTIONS", "poster": "streaming_platforms.jpg"},
+    3: {"name": "FRANCHISE COLLECTIONS", "poster": "uses TMDB API for poster fetching"},
+    4: {"name": "GENRE COLLECTIONS", "poster": "genres.jpg"},
+    5: {"name": "DIRECTOR COLLECTIONS", "poster": "director.jpg"},
+    6: {"name": "ACTOR COLLECTIONS", "poster": "actor.jpg"},
+    7: {"name": "DECADE COLLECTIONS", "poster": "decade.jpg"},
+    8: {"name": "CRITICALLY ACCLAIMED COLLECTIONS", "poster": "award.jpg"},
+    9: {"name": "ADDITIONAL THEME & KEYWORD COLLECTIONS", "poster": "themes.jpg"},
+    10: {"name": "STUDIO COLLECTIONS", "poster": "studio.jpg"},
+    11: {"name": "LANGUAGE & REGIONAL CINEMA", "poster": "languages.jpg"}
+}
+
 COLLECTION_RECIPES: List[Dict[str, Any]] = [
     #############################################
-    # SECTION 1: TMDb GENERAL COLLECTIONS
+    # CATEGORY 1: TMDb GENERAL COLLECTIONS POSTER:tmdb.jpg
     #############################################
     {
         "name": "Popular Movies on TMDb",
@@ -35,10 +50,9 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'Blockbusters of All Time', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'revenue.desc', 'vote_count.gte': 500}, 'item_limit': 30, 'target_servers': ['emby']},
     {'name': 'Recent Indie Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'popularity.desc', 'primary_release_date.gte': '2023-01-01', 'vote_average.gte': 6, 'with_companies': '194'}, 'item_limit': 30, 'target_servers': ['emby']},
     {'name': 'Foreign Language Hits', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'vote_average.desc', 'vote_count.gte': 300, 'with_original_language': 'ko,fr,es,de,ja', 'vote_average.gte': 7}, 'item_limit': 30, 'target_servers': ['emby']},
-    {'name': 'Top Animated Features', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'sort_by': 'vote_average.desc', 'vote_count.gte': 300, 'with_genres': '16', 'vote_average.gte': 7}, 'item_limit': 30, 'target_servers': ['emby']},
     
     #############################################
-    # CATEGORY 2: STREAMING PLATFORM COLLECTIONS
+    # CATEGORY 2: STREAMING PLATFORM COLLECTIONS POSTER:streaming_platforms.jpg
     #############################################
     # Netflix Collections
     {'name': 'Popular on Netflix', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '8', 'watch_region': 'US', 'sort_by': 'popularity.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
@@ -94,7 +108,7 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'Horror Movies on Shudder', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_watch_providers': '99', 'watch_region': 'US', 'with_genres': '27', 'sort_by': 'popularity.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
     
     #############################################
-    # CATEGORY 3: FRANCHISE COLLECTIONS
+    # CATEGORY 3: FRANCHISE COLLECTIONS POSTER:uses TMDB API for poster fetching
     #############################################
     {
         "name": "Star Wars Collection",
@@ -132,7 +146,7 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
         "sort_by": "release_date"
     },
 
-        {'name': 'The Lord of the Rings Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 119, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Lord of the Rings Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 119, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'The Hobbit Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 121938, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'Jurassic Park Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 328, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'The Matrix Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2344, 'target_servers': ['emby'], 'sort_by': 'release_date'},
@@ -204,16 +218,27 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'The Karate Kid Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 8580, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'The Fast and the Furious Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 9485, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'The Hannibal Lecter Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 9743, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Terminator Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 528, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'The Lion King (Reboot) Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 762512, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'Devara Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1187990, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Alien Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 8091, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Die Hard Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1570, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Ghostbusters Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2980, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'Bullet Train Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1471524, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Avengers Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 86311, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Pirates of the Caribbean Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 295, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'Spider-Man (MCU) Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 531241, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Matrix Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 2344, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'Spider-Man Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 556, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'The Quintessential Quintuplets Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1287339, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'xXx Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 52785, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'Ip Man Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 70068, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'Avatar Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 87096, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'Fault Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1156666, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Jurassic Park Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 328, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Hobbit Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 121938, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Toy Story Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 10194, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Iron Man Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 131292, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'The Legend of Hei Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1444577, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'O Auto da Compadecida: Coleção', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1219938, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'The Wild Robot Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1370345, 'target_servers': ['emby'], 'sort_by': 'release_date'},
@@ -224,11 +249,17 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'Psycho Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 119674, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'Spider-Man: Spider-Verse Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 573436, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'The Conjuring Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 313086, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Final Destination Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 8864, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Mission: Impossible Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 87359, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Godfather Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 230, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Dark Knight Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 263, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'The Lord of the Rings Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 119, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'Lost Bullet Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1002775, 'target_servers': ['emby'], 'sort_by': 'release_date'},
     {'name': 'The Minecraft Movie Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 1461530, 'target_servers': ['emby'], 'sort_by': 'release_date'},
+    {'name': 'Captain America Collection', 'source_type': 'tmdb_series_collection', 'tmdb_collection_id': 131295, 'target_servers': ['emby'], 'sort_by': 'release_date'},
 
     #############################################
-    # CATEGORY 4: GENRE COLLECTIONS
+    # CATEGORY 4: GENRE COLLECTIONS POSTER:genres.jpg
     #############################################
     {
         "item_limit": 30,
@@ -341,10 +372,11 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'item_limit': 30, 'name': 'Western Movies', 'source_type': 'tmdb_discover_individual_movies', 'target_servers': ['emby'], 'tmdb_discover_params': {'sort_by': 'popularity.desc', 'vote_count.gte': 50, 'with_genres': '37'}},
     {'name': 'Action Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '28', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
     {'name': 'Comedy Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '35', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
+    {'name': 'Adventure & Fantasy Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_genres': '12,14', 'sort_by': 'popularity.desc', 'vote_count.gte': 75}, 'item_limit': 25, 'target_servers': ['emby']},
     
     
     #############################################
-    # CATEGORY 5: DIRECTOR COLLECTIONS
+    # CATEGORY 5: DIRECTOR COLLECTIONS POSTER:director.jpg
     #############################################
     {'name': 'Christopher Nolan Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '525', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Martin Scorsese Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '1032', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
@@ -369,7 +401,7 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'Ang Lee Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '1614', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     
     #############################################
-    # CATEGORY 6: ACTOR COLLECTIONS
+    # CATEGORY 6: ACTOR COLLECTIONS POSTER:actor.jpg
     #############################################
     {'name': 'Jennifer Lawrence Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '72129', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
     {'name': 'Brad Pitt Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '287', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
@@ -401,6 +433,20 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'Sam Raimi Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '7623', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Danny Boyle Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '2034', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Paul Thomas Anderson Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '4762', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'Sofia Coppola Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '1769', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'Alejandro González Iñárritu Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '223', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'Greta Gerwig Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '45400', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'Kathryn Bigelow Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '14392', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'Ingmar Bergman Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '6648', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'Federico Fellini Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '4415', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'Orson Welles Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '40', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'John Ford Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '1090553', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'Woody Allen Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '1243', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'Billy Wilder Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '3146', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'Werner Herzog Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '6818', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'John Carpenter Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '11770', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'Sam Raimi Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '7623', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
+    {'name': 'Danny Boyle Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '2034', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Robert Zemeckis Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '24', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Bong Joon-ho Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '21684', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
     {'name': 'Andrei Tarkovsky Collection', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_people': '8452', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 15, 'target_servers': ['emby']},
@@ -442,7 +488,7 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': "Lupita Nyong'o Movies", 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_cast': '1267329', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 20, 'target_servers': ['emby']},
     
     #############################################
-    # CATEGORY 7: DECADE COLLECTIONS
+    # CATEGORY 7: DECADE COLLECTIONS   POSTER:decade.jpg
     #############################################
     {'name': '1950s Classics', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'primary_release_date.gte': '1950-01-01', 'primary_release_date.lte': '1959-12-31', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': '1960s Classics', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'primary_release_date.gte': '1960-01-01', 'primary_release_date.lte': '1969-12-31', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 25, 'target_servers': ['emby']},
@@ -454,15 +500,25 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': '2020s Classics', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'primary_release_date.gte': '2020-01-01', 'primary_release_date.lte': '2029-12-31', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 25, 'target_servers': ['emby']},
     
     #############################################
-    # CATEGORY 8: CRITICALLY ACCLAIMED COLLECTIONS
+    # CATEGORY 8: CRITICALLY ACCLAIMED COLLECTIONS POSTER:award.jpg
     #############################################
     {'name': 'Oscar-Winning Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '1498', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
     {'name': 'Golden Globe-Winning Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '10483', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
     {'name': 'Critically Acclaimed Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'vote_average.gte': 8, 'vote_count.gte': 1000, 'sort_by': 'vote_average.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Oscar Best Picture Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '207468', 'sort_by': 'primary_release_date.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Oscar Best Director Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '209485', 'sort_by': 'primary_release_date.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'BAFTA Award-Winning Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '207362', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Cannes Film Festival Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '2243,209537', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Sundance Film Festival Favorites', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '7994', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Venice Film Festival Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '207868', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Berlin Film Festival Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '209863', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Independent Spirit Award Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '209676', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
+    {'name': 'Hidden Masterpieces', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'vote_average.gte': 8.5, 'vote_count.gte': 100, 'vote_count.lte': 500, 'sort_by': 'vote_average.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
+
     
     
     #############################################
-    # CATEGORY 9: ADDITIONAL THEME & KEYWORD COLLECTIONS
+    # CATEGORY 9: ADDITIONAL THEME & KEYWORD COLLECTIONS POSTER:themes.jpg
     #############################################
     {'name': 'Time Travel Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '4565', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 25, 'target_servers': ['emby']},
     {'name': 'Dystopian Future Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '12565', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 25, 'target_servers': ['emby']},
@@ -538,23 +594,9 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'Unreliable Narrator', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '278069', 'sort_by': 'popularity.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
 
 
-    
-    #############################################
-    # CATEGORY 10: AWARD-WINNING COLLECTIONS
-    #############################################
-    {'name': 'Oscar Best Picture Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '207468', 'sort_by': 'primary_release_date.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Oscar Best Director Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '209485', 'sort_by': 'primary_release_date.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'BAFTA Award-Winning Movies', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '207362', 'sort_by': 'vote_average.desc', 'vote_count.gte': 100}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Cannes Film Festival Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '2243,209537', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Sundance Film Festival Favorites', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '7994', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Venice Film Festival Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '207868', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Berlin Film Festival Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '209863', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Independent Spirit Award Winners', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_keywords': '209676', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 40, 'target_servers': ['emby']},
-    {'name': 'Hidden Masterpieces', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'vote_average.gte': 8.5, 'vote_count.gte': 100, 'vote_count.lte': 500, 'sort_by': 'vote_average.desc'}, 'item_limit': 40, 'target_servers': ['emby']},
 
-    
     #############################################
-    # CATEGORY 11: STUDIO COLLECTIONS
+    # CATEGORY 10: STUDIO COLLECTIONS POSTER:studio.jpg
     #############################################
     {'name': 'Pixar Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '3', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
     {'name': 'Lucasfilm Films', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_companies': '1', 'sort_by': 'popularity.desc', 'vote_count.gte': 20}, 'item_limit': 30, 'target_servers': ['emby']},
@@ -589,7 +631,7 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     
     
     #############################################
-    # CATEGORY 12: LANGUAGE & REGIONAL CINEMA
+    # CATEGORY 11: LANGUAGE & REGIONAL CINEMA POSTER:languages.jpg
     #############################################
     {'name': 'French Cinema', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_original_language': 'fr', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
     {'name': 'Italian Cinema', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_original_language': 'it', 'sort_by': 'vote_average.desc', 'vote_count.gte': 50}, 'item_limit': 30, 'target_servers': ['emby']},
@@ -639,27 +681,6 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'South Asian Cinema', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_original_language': 'hi,bn,ta,te,ml,kn', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 40, 'target_servers': ['emby']},
     {'name': 'Middle Eastern Cinema', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_original_language': 'ar,fa,he,tr', 'sort_by': 'vote_average.desc', 'vote_count.gte': 20}, 'item_limit': 40, 'target_servers': ['emby']},
     
-
-    #############################################
-    # CATEGORY 13: CINEMATOGRAPHER COLLECTIONS
-    #############################################
-    {'name': 'Films Shot by Roger Deakins', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '151', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Films Shot by Emmanuel Lubezki', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '4185', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Films Shot by Janusz Kamiński', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '492', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Films Shot by Robert Richardson', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '149', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Films Shot by Conrad L. Hall', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '8217', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Films Shot by Vittorio Storaro', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '7202', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Films Shot by Hoyte van Hoytema', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '74401', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Films Shot by Gordon Willis', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '3097', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Films Shot by Darius Khondji', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '2240', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Films Shot by Sven Nykvist', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '11905', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Films Shot by Greig Fraser', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '67113', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Films Shot by Bradford Young', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '1046612', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Films Shot by Rodrigo Prieto', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '275', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Films Shot by Linus Sandgren', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '969171', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    {'name': 'Films Shot by Rachel Morrison', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_crew': '984113', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 25, 'target_servers': ['emby']},
-    
-
 
 ]
 

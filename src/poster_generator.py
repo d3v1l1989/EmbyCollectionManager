@@ -19,11 +19,11 @@ logger = logging.getLogger(__name__)
 # Default settings
 DEFAULT_TEMPLATE = "default.png"
 # Increased font size range by 30% + 20% as requested
-DEFAULT_FONT_SIZE_RANGE = (88, 140)  # min, max font size - significantly increased
+DEFAULT_FONT_SIZE_RANGE = (95, 150)  # min, max font size - significantly increased
 DEFAULT_TEXT_COLOR = (255, 255, 255)  # white
 # No background as requested
 DEFAULT_TEXT_POSITION = 0.5  # 50% from top (center of poster)
-DEFAULT_IMAGE_QUALITY = 90
+DEFAULT_IMAGE_QUALITY = 100
 # Standard movie poster resolution for Emby (2:3 aspect ratio)
 DEFAULT_POSTER_SIZE = (1000, 1500) 
 # Safe margin percentage (% of poster width to keep as margin on each side)
