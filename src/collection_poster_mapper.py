@@ -117,6 +117,20 @@ def find_collection_category(collection_name: str, recipes_file_path: str) -> Op
     Returns:
         Category number or None if not found
     """
+    # Special case for specific collections we know the category for
+    collection_to_category_map = {
+        "Popular Movies on TMDb": 1,  # TMDb GENERAL COLLECTIONS
+        "Trending Movies on TMDb": 1,
+        "Top Rated Movies on TMDb": 1,
+        "Now Playing in Theaters": 1,
+        "Upcoming Movies": 1
+    }
+    
+    # Check if this is a known collection with a predefined category
+    if collection_name in collection_to_category_map:
+        category = collection_to_category_map[collection_name]
+        logger.info(f"[DOCKER DEBUG] Using hardcoded category {category} for collection '{collection_name}'")
+        return category
     logger.info(f"[DOCKER DEBUG] Finding category for collection: '{collection_name}'")
     logger.info(f"[DOCKER DEBUG] Using recipes file: {recipes_file_path}")
     
@@ -211,7 +225,39 @@ def get_poster_template_for_collection(
         logger.warning(f"Using default poster for collection '{collection_name}' - category not found")
         return "default.png"
     
-    # Get the poster template for this category
+    # Explicitly map category numbers to template files for clarity
+    category_to_template_map = {
+        1: "tmdb.jpg",          # TMDb GENERAL COLLECTIONS
+        2: None,                # FRANCHISE COLLECTIONS (use TMDb posters)
+        3: "genres.jpg",        # GENRE COLLECTIONS
+        4: "genres.jpg",        # MIXED GENRE COLLECTIONS
+        5: "director.jpg",      # DIRECTOR COLLECTIONS
+        6: "actor.jpg",         # ACTOR COLLECTIONS
+        7: "decade.jpg",        # DECADE COLLECTIONS
+        8: None,                # POPULAR & CURATED COLLECTIONS (may use TMDb posters)
+        9: "award.jpg",         # AWARD-WINNING COLLECTIONS
+        10: "studio.jpg",       # STUDIO COLLECTIONS
+        11: "themes.jpg",       # THEME & KEYWORD COLLECTIONS
+        12: "languages.jpg",    # LANGUAGE & REGIONAL CINEMA
+        13: "languages.jpg",    # REGIONAL CINEMA GROUPS
+        14: "director.jpg",     # CINEMATOGRAPHER COLLECTIONS (use director template)
+        15: "director.jpg"      # COMPOSER COLLECTIONS (use director template)
+    }
+    
+    # Log the mapping for debugging
+    logger.info(f"[DOCKER DEBUG] Category number {category_number} for collection '{collection_name}'")
+    
+    # First check our explicit map
+    if category_number in category_to_template_map:
+        template = category_to_template_map[category_number]
+        if template:
+            logger.info(f"[DOCKER DEBUG] Using explicitly mapped template '{template}' for category {category_number}")
+            return template
+        elif template is None and category_number in [2, 8]:  # Franchise collections
+            logger.info(f"[DOCKER DEBUG] Using None for franchise collection in category {category_number}")
+            return None
+    
+    # If not in our map, try the category_poster_map as backup
     category_info = category_poster_map.get(category_number)
     if not category_info:
         # Fallback to default poster if no template assigned to category
@@ -220,8 +266,10 @@ def get_poster_template_for_collection(
     
     # Special case for franchise collections which use TMDb posters
     if category_info['name'] == "FRANCHISE COLLECTIONS" or "uses TMDB API" in category_info['poster'].lower():
+        logger.info(f"[DOCKER DEBUG] Category {category_number} is a franchise collection, returning None")
         return None
     
+    logger.info(f"[DOCKER DEBUG] Using template '{category_info['poster']}' from category_info")
     return category_info['poster']
 
 def check_poster_template_exists(template_name: str, templates_dir: str) -> bool:
