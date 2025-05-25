@@ -42,7 +42,20 @@ def load_category_config(recipes_file_path: str) -> Dict[int, Dict[str, str]]:
         
         # Get the CATEGORY_CONFIG dictionary
         if hasattr(module, 'CATEGORY_CONFIG'):
-            return module.CATEGORY_CONFIG
+            category_config = module.CATEGORY_CONFIG
+            logger.info(f"Successfully loaded CATEGORY_CONFIG with {len(category_config)} categories")
+            
+            # Fix any tmdb.jpg references to use tmdb.png instead
+            for cat_id, cat_info in category_config.items():
+                if cat_info.get('poster') == 'tmdb.jpg':
+                    cat_info['poster'] = 'tmdb.png'
+                    logger.info(f"Updated template for category {cat_id} from 'tmdb.jpg' to 'tmdb.png'")
+                    
+            # Log loaded categories for debugging
+            for cat_id, cat_info in category_config.items():
+                logger.info(f"Category {cat_id}: '{cat_info.get('name')}' uses template '{cat_info.get('poster')}'")    
+                
+            return category_config
         else:
             logger.warning(f"CATEGORY_CONFIG not found in {recipes_file_path}")
             return {}
@@ -84,51 +97,31 @@ def get_poster_template_for_collection(
     category_number = category_id
     logger.info(f"Using category ID {category_id} for collection '{collection_name}'")
     
-    # Explicitly map category numbers to template files for clarity
-    # This serves as the primary source of truth for category-to-template mapping
-    category_to_template_map = {
-        1: "tmdb.png",          # TMDb GENERAL COLLECTIONS
-        2: None,                # FRANCHISE COLLECTIONS (use TMDb posters)
-        3: "genres.jpg",        # GENRE COLLECTIONS
-        4: "genres.jpg",        # MIXED GENRE COLLECTIONS
-        5: "director.jpg",      # DIRECTOR COLLECTIONS
-        6: "actor.jpg",         # ACTOR COLLECTIONS
-        7: "decade.jpg",        # DECADE COLLECTIONS
-        8: None,                # POPULAR & CURATED COLLECTIONS (may use TMDb posters)
-        9: "award.jpg",         # AWARD-WINNING COLLECTIONS
-        10: "studio.jpg",       # STUDIO COLLECTIONS
-        11: "themes.jpg",       # THEME & KEYWORD COLLECTIONS
-        12: "languages.jpg",    # LANGUAGE & REGIONAL CINEMA
-        13: "languages.jpg",    # REGIONAL CINEMA GROUPS
-        14: "director.jpg",     # CINEMATOGRAPHER COLLECTIONS (use director template)
-        15: "director.jpg"      # COMPOSER COLLECTIONS (use director template)
-    }
-    
-    # First check our explicit map
-    if category_number in category_to_template_map:
-        template = category_to_template_map[category_number]
-        if template:
-            logger.info(f"Using template '{template}' for category {category_number}")
-            return template
-        elif template is None and category_number in [2, 8]:  # Franchise collections
-            logger.info(f"Using TMDb API poster for franchise collection in category {category_number}")
-            return None
-    
-    # If not in our map, try the category_poster_map as backup
+    # Get the template directly from the category_poster_map which contains the CATEGORY_CONFIG from collection_recipes.py
+    # This ensures we're using the official mapping from the config file
     category_info = category_poster_map.get(category_number)
+    
     if not category_info:
         # Fallback to default poster if no template assigned to category
         logger.warning(f"Using default poster for category {category_number} - no template assigned")
         return "default.png"
     
+    # Get the poster template from the category info
+    poster_template = category_info.get('poster')
+    
     # Special case for franchise collections which use TMDb posters
     if category_info.get('name') == "FRANCHISE COLLECTIONS" or \
-       (isinstance(category_info.get('poster'), str) and "uses TMDB API" in category_info['poster'].lower()):
+       (isinstance(poster_template, str) and "uses TMDB API" in poster_template.lower()):
         logger.info(f"Category {category_number} is a franchise collection, using TMDb API poster")
         return None
     
-    logger.info(f"Using template '{category_info['poster']}' from category_info")
-    return category_info['poster']
+    # Fix the tmdb.jpg to tmdb.png issue
+    if poster_template == "tmdb.jpg":
+        poster_template = "tmdb.png"
+        logger.info(f"Converted tmdb.jpg to tmdb.png for category {category_number}")
+    
+    logger.info(f"Using template '{poster_template}' from CATEGORY_CONFIG for category {category_number}")
+    return poster_template
 
 def check_poster_template_exists(template_name: str, templates_dir: str) -> bool:
     """
@@ -155,15 +148,18 @@ def is_franchise_collection(category_number: int, category_poster_map: Dict[int,
     Returns:
         True if it's a franchise category, False otherwise
     """
-    # First check the hardcoded franchise categories
-    if category_number in [2, 8]:
-        return True
-        
-    # Then check the category_poster_map
+    # Check the category in the category_poster_map
     category_info = category_poster_map.get(category_number)
     if not category_info:
         return False
     
-    # Check if this is the franchise category or if it uses TMDb API for posters
-    return (category_info.get('name') == "FRANCHISE COLLECTIONS" or 
-            (isinstance(category_info.get('poster'), str) and "uses TMDB API" in category_info['poster'].lower()))
+    # Check if this is the franchise category by name
+    if category_info.get('name') == "FRANCHISE COLLECTIONS":
+        return True
+        
+    # Check if the poster description indicates it uses TMDb API
+    poster_info = category_info.get('poster')
+    if isinstance(poster_info, str) and "uses TMDB API" in poster_info.lower():
+        return True
+        
+    return False
