@@ -56,6 +56,22 @@ def generate_custom_poster(
     Returns:
         Path to generated poster image file or None if generation failed
     """
+    # DIRECT FIX: Override template selection for specific collections
+    # This ensures Docker environment uses the correct templates
+    collection_template_override = {
+        "Popular Movies on TMDb": "tmdb.jpg",
+        "Trending Movies on TMDb": "tmdb.jpg",
+        "Top Rated Movies on TMDb": "tmdb.jpg",
+        "Now Playing in Theaters": "tmdb.jpg",
+        "Upcoming Movies": "tmdb.jpg"
+    }
+    
+    # If this collection has an override, use it regardless of what was passed in
+    if collection_name in collection_template_override:
+        override_template = collection_template_override[collection_name]
+        logger.info(f"[DOCKER OVERRIDE] Using override template '{override_template}' for collection '{collection_name}'")
+        template_name = override_template
+    
     # Handle default values and type conversions for parameters
     if text_color is None:
         text_color = DEFAULT_TEXT_COLOR
