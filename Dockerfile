@@ -17,7 +17,6 @@ COPY src/ ./src/
 COPY main.py ./
 COPY config/ ./config/
 COPY resources/ ./resources/
-COPY docker_test_resources.py ./
 
 # Create traktlists directory for user-defined collections
 RUN mkdir -p /app/traktlists
