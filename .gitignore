@@ -13,9 +13,10 @@ src/testnames.py
 src/testrecipes.py
 test_poster_generator.py
 debug_poster_selection.py
+docker_test_resources.py
+test_traktlists.py
 
-# Include diagnostic scripts
-!docker_test_resources.py
+# Include diagnostic scripts (none currently tracked)
 
 # Collection generators (except collection_recipes.py)
 src/artist_collections.py
