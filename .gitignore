@@ -46,6 +46,9 @@ src/merge_collections.py
 # Planning and task files
 PLANNING.md
 TASK.md
+CLAUDE.md
+TRAKT_INTEGRATION.md
+TRAKTLISTS_IMPLEMENTATION.md
 
 # Temporary files
 *.tmp
