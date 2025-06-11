@@ -201,3 +201,58 @@ class TmdbClient:
             result['backdrop'] = self.get_image_url(collection_data['backdrop_path'])
             
         return result
+
+    def search_movies(self, query, page_limit=1):
+        """
+        Search for movies by title using TMDb search API.
+        
+        Args:
+            query: Movie title to search for
+            page_limit: Maximum number of pages to fetch (default 1)
+            
+        Returns:
+            List of movie dictionaries from search results
+        """
+        url = f"{self.BASE_URL}/search/movie"
+        all_results = []
+        seen_ids = set()
+        
+        current_page = 1
+        total_pages = 1
+        
+        while True:
+            if page_limit is not None and current_page > page_limit:
+                break
+                
+            params = {
+                "api_key": self.api_key,
+                "query": query,
+                "page": current_page,
+                "include_adult": False  # Filter out adult content
+            }
+            
+            try:
+                resp = self.session.get(url, params=params, timeout=10)
+                resp.raise_for_status()
+                data = resp.json()
+                
+                if current_page == 1:
+                    total_pages = data.get("total_pages", 1)
+                    
+                results = data.get("results", [])
+                for movie in results:
+                    if movie["id"] not in seen_ids:
+                        seen_ids.add(movie["id"])
+                        all_results.append(movie)
+                        
+                if current_page >= total_pages:
+                    break
+                    
+                current_page += 1
+                
+            except requests.RequestException as e:
+                self.logger.error(f"TMDb search_movies failed: {e}")
+                break
+                
+        self.logger.debug(f"TMDb search for '{query}' returned {len(all_results)} results")
+        return all_results

@@ -1,6 +1,7 @@
 ---
 # Sample custom lists file for TMDbCollector
-# This file demonstrates different ways to define collections for Jellyfin
+# This file demonstrates different ways to define collections for Emby/Jellyfin
+# Supports TMDb IDs, Trakt list references, and mixed content
 
 # Example 1: Simple list with TMDb IDs
 - name: "Oscar Winners 2020s"
@@ -39,3 +40,38 @@
     - 157336  # Interstellar
     - 419704  # Dunkirk
     - 702091  # Oppenheimer
+
+# Example 4: Trakt list integration
+- name: "Top 250 Movies from Trakt"
+  description: "Popular top-rated movies from a Trakt community list"
+  items:
+    - trakt_list:
+        username: "lish408"
+        list_slug: "top-250-movies"
+
+# Example 5: Mixed TMDb IDs and Trakt references
+- name: "My Favorites Plus Trakt Watchlist"
+  description: "Combination of personal picks and Trakt watchlist"
+  items:
+    # Some personal TMDb picks
+    - 550    # Fight Club
+    - 13     # Forrest Gump
+    - 680    # Pulp Fiction
+    # Plus everything from my Trakt watchlist
+    - trakt_watchlist:
+        username: "me"  # Uses authenticated user's watchlist
+
+# Example 6: Multiple Trakt sources
+- name: "Comprehensive Action Collection"
+  description: "Action movies from various Trakt sources"
+  items:
+    # From a specific Trakt list
+    - trakt_list:
+        username: "actionfan123"
+        list_slug: "best-action-movies"
+    # Plus some manual additions
+    - 346364  # It
+    - 11      # Star Wars
+    # Plus from my personal collection
+    - trakt_watchlist:
+        username: "me"

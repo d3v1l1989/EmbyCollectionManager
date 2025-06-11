@@ -11,6 +11,19 @@ emby:
   server_url: "YOUR EMBY URL"
   user_id: "YOUR EMBY USER ID"
 
+# Trakt configuration
+trakt:
+  client_id: "YOUR TRAKT CLIENT ID"
+  client_secret: "YOUR TRAKT CLIENT SECRET"
+  access_token: "YOUR TRAKT ACCESS TOKEN"  # Optional, can be obtained via OAuth flow
+  username: "YOUR TRAKT USERNAME"  # Optional, for accessing specific user lists
+
+# Trakt lists configuration
+traktlists:
+  enabled: true                          # Enable/disable Trakt list processing
+  directory: "traktlists"                # Directory to scan for Trakt list files
+  random_poster: true                    # Use random movie poster from collection
+  max_items_per_collection: 100          # Maximum items per collection (0 = no limit)
 
 # Custom poster generation settings
 poster_settings:

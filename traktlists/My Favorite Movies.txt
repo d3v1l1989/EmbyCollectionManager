@@ -1,0 +1,17 @@
+# My Favorite Movies Collection
+# This is a sample collection showing different input formats
+
+# Movies by TMDb ID
+550        # Fight Club
+13         # Forrest Gump
+155        # The Dark Knight
+278        # The Shawshank Redemption
+
+# Movies by title (will be searched on TMDb)
+The Matrix
+Inception
+Pulp Fiction
+The Godfather
+
+# You can also add Trakt list URLs like:
+# https://trakt.tv/users/username/lists/my-list-name

@@ -15,7 +15,8 @@ CATEGORY_CONFIG = {
     8: {"name": "CRITICALLY ACCLAIMED COLLECTIONS", "poster": "award.jpg"},
     9: {"name": "ADDITIONAL THEME & KEYWORD COLLECTIONS", "poster": "themes.jpg"},
     10: {"name": "STUDIO COLLECTIONS", "poster": "studio.jpg"},
-    11: {"name": "LANGUAGE & REGIONAL CINEMA", "poster": "languages.jpg"}
+    11: {"name": "LANGUAGE & REGIONAL CINEMA", "poster": "languages.jpg"},
+    12: {"name": "TRAKT COLLECTIONS", "poster": "default.png"}
 }
 
 COLLECTION_RECIPES: List[Dict[str, Any]] = [
@@ -698,6 +699,60 @@ COLLECTION_RECIPES: List[Dict[str, Any]] = [
     {'name': 'South Asian Cinema', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_original_language': 'hi,bn,ta,te,ml,kn', 'sort_by': 'vote_average.desc', 'vote_count.gte': 30}, 'item_limit': 40, 'target_servers': ['emby'], 'category_id': 11},
     {'name': 'Middle Eastern Cinema', 'source_type': 'tmdb_discover_individual_movies', 'tmdb_discover_params': {'with_original_language': 'ar,fa,he,tr', 'sort_by': 'vote_average.desc', 'vote_count.gte': 20}, 'item_limit': 40, 'target_servers': ['emby'], 'category_id': 11},
     
+    #############################################
+    # CATEGORY 12: TRAKT COLLECTIONS POSTER:default.png
+    #############################################
+    
+    # Example Trakt watchlist collection
+    {
+        "name": "My Trakt Watchlist",
+        "source_type": "trakt_watchlist",
+        "target_servers": ['emby'],
+        "category_id": 12,
+        "description": "Movies from your Trakt watchlist"
+    },
+    
+    # Example Trakt collection
+    {
+        "name": "My Trakt Collection",
+        "source_type": "trakt_collection",
+        "target_servers": ['emby'],
+        "category_id": 12,
+        "description": "Movies from your Trakt collection"
+    },
+    
+    # Example custom Trakt list
+    {
+        "name": "Top 250 Movies",
+        "source_type": "trakt_list",
+        "trakt_list_params": {
+            "username": "lish408",
+            "list_slug": "top-250-movies"
+        },
+        "target_servers": ['emby'],
+        "category_id": 12,
+        "description": "Popular Trakt list of top-rated movies"
+    },
+    
+    # Example trending lists
+    {
+        "name": "Trakt Trending Movies",
+        "source_type": "trakt_trending_list",
+        "item_limit": 50,
+        "target_servers": ['emby'],
+        "category_id": 12,
+        "description": "Currently trending movies on Trakt"
+    },
+    
+    # Example popular lists
+    {
+        "name": "Trakt Popular Movies",
+        "source_type": "trakt_popular_list",
+        "item_limit": 50,
+        "target_servers": ['emby'],
+        "category_id": 12,
+        "description": "Popular movies on Trakt"
+    }
 
 ]
 

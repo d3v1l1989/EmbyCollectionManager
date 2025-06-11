@@ -1,7 +1,10 @@
 import argparse
 import sys
 import logging
+import random
 from src.tmdb_fetcher import TmdbClient
+from src.trakt_client import TraktClient
+from src.trakt_list_processor import TraktListProcessor
 from src.emby_client import EmbyClient
 from src.collection_recipes import RECIPES  # Assumes recipes are defined here
 import yaml
@@ -49,6 +52,20 @@ def main():
     except Exception as e:
         logger.critical(f"Failed to initialize TMDb client: {e}")
         sys.exit(1)
+
+    # Initialize Trakt client if configured
+    trakt = None
+    if 'trakt' in config and config['trakt'].get('client_id'):
+        try:
+            trakt = TraktClient(
+                client_id=config['trakt']['client_id'],
+                client_secret=config['trakt'].get('client_secret'),
+                access_token=config['trakt'].get('access_token')
+            )
+            logger.info("Trakt client initialized successfully")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Trakt client: {e}")
+            logger.warning("Trakt-based collections will be skipped")
 
     # Determine if we should sync to Emby based on args and available config
     sync_emby = False
@@ -128,6 +145,59 @@ def main():
                 logger.info(f"Discovering movies using: {tmdb_discover_params}")
                 discovered_movies = tmdb.discover_movies(tmdb_discover_params, item_limit)
                 tmdb_ids = [movie['id'] for movie in discovered_movies]
+            
+            # Trakt-based source types
+            elif source_type in ['trakt_watchlist', 'trakt_collection', 'trakt_list', 'trakt_trending_list', 'trakt_popular_list']:
+                if not trakt:
+                    logger.warning(f"Recipe {collection_name} requires Trakt client, but it's not configured. Skipping.")
+                    continue
+                
+                logger.info(f"Processing Trakt source: {source_type}")
+                trakt_items = []
+                
+                if source_type == 'trakt_watchlist':
+                    # Get authenticated user's watchlist
+                    username = config.get('trakt', {}).get('username', 'me')
+                    trakt_items = trakt.get_watchlist(username, 'movies')
+                    
+                elif source_type == 'trakt_collection':
+                    # Get authenticated user's collection
+                    username = config.get('trakt', {}).get('username', 'me')
+                    trakt_items = trakt.get_collection(username, 'movies')
+                    
+                elif source_type == 'trakt_list':
+                    # Get specific user list
+                    trakt_list_params = recipe.get('trakt_list_params', {})
+                    username = trakt_list_params.get('username')
+                    list_slug = trakt_list_params.get('list_slug')
+                    
+                    if not username or not list_slug:
+                        logger.warning(f"Recipe {collection_name} is missing username or list_slug in trakt_list_params")
+                        continue
+                        
+                    trakt_items = trakt.get_list_items(username, list_slug, 'movies')
+                    
+                elif source_type == 'trakt_trending_list':
+                    # Get trending lists and use the first one
+                    trending_lists = trakt.get_trending_lists(1)
+                    if trending_lists:
+                        list_data = trending_lists[0]
+                        trakt_items = trakt.get_list_items(list_data['user']['username'], list_data['slug'], 'movies')
+                        
+                elif source_type == 'trakt_popular_list':
+                    # Get popular lists and use the first one
+                    popular_lists = trakt.get_popular_lists(1)
+                    if popular_lists:
+                        list_data = popular_lists[0]
+                        trakt_items = trakt.get_list_items(list_data['user']['username'], list_data['slug'], 'movies')
+                
+                # Extract TMDb IDs from Trakt items
+                tmdb_ids = trakt.extract_tmdb_ids(trakt_items, 'movie')
+                
+                # Apply item limit if specified
+                if item_limit and len(tmdb_ids) > item_limit:
+                    tmdb_ids = tmdb_ids[:item_limit]
+                    logger.info(f"Limited results to {item_limit} items for collection '{collection_name}'")
             
             else:
                 logger.warning(f"Unsupported source_type '{source_type}' for {collection_name}")
@@ -221,6 +291,103 @@ def main():
             except Exception as e:
                 logger.error(f"Error processing collection '{collection_name}' for Emby: {e}")
 
+    # Process custom lists if provided
+    if args.custom_list:
+        logger.info(f"Processing custom lists from: {args.custom_list}")
+        custom_lists = load_custom_lists(args.custom_list)
+        
+        for list_info in custom_lists:
+            try:
+                process_custom_list(list_info, tmdb, trakt, emby)
+            except Exception as e:
+                list_name = list_info.get('name', 'Unknown')
+                logger.error(f"Error processing custom list '{list_name}': {e}")
+
+    # Process Trakt lists from traktlists directory
+    try:
+        trakt_processor = TraktListProcessor(tmdb, trakt, config)
+        trakt_collections = trakt_processor.scan_traktlists_directory()
+        
+        if trakt_collections:
+            logger.info(f"Processing {len(trakt_collections)} Trakt list collections")
+            
+            for collection_info in trakt_collections:
+                try:
+                    collection_name = collection_info['name']
+                    tmdb_ids = collection_info['tmdb_ids']
+                    
+                    if not tmdb_ids:
+                        logger.warning(f"No movies found for Trakt collection '{collection_name}', skipping")
+                        continue
+                    
+                    logger.info(f"Processing Trakt collection: {collection_name}")
+                    
+                    if emby:
+                        collection_id = _sync_collection(emby, collection_name, tmdb_ids)
+                        
+                        if collection_id:
+                            # Use random movie poster for Trakt collections
+                            poster_url, backdrop_url = get_random_movie_artwork(tmdb, tmdb_ids, collection_name)
+                            
+                            if poster_url or backdrop_url:
+                                logger.info(f"Applying random movie artwork to Trakt collection '{collection_name}'")
+                                if emby.update_collection_artwork(collection_id, poster_url, backdrop_url):
+                                    logger.info(f"Successfully updated artwork for Trakt collection '{collection_name}'")
+                                else:
+                                    logger.warning(f"Failed to update artwork for Trakt collection '{collection_name}'")
+                            else:
+                                logger.info(f"No artwork found for Trakt collection '{collection_name}'")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing Trakt collection '{collection_info.get('name', 'Unknown')}': {e}")
+        else:
+            logger.info("No Trakt list collections found to process")
+            
+    except Exception as e:
+        logger.error(f"Error during Trakt list processing: {e}")
+
+def get_random_movie_artwork(tmdb_client, tmdb_ids, collection_name):
+    """
+    Get artwork from a randomly selected movie in the collection.
+    
+    Args:
+        tmdb_client: TMDb client instance
+        tmdb_ids: List of TMDb movie IDs
+        collection_name: Collection name for logging
+        
+    Returns:
+        Tuple of (poster_url, backdrop_url)
+    """
+    if not tmdb_ids:
+        return None, None
+        
+    # Randomly select a movie from the collection
+    selected_movie_id = random.choice(tmdb_ids)
+    logger.info(f"Selected random movie ID {selected_movie_id} for '{collection_name}' poster")
+    
+    try:
+        movie_details = tmdb_client.get_movie_details(selected_movie_id)
+        if not movie_details:
+            logger.warning(f"Could not fetch details for movie ID {selected_movie_id}")
+            return None, None
+            
+        poster_url = None
+        backdrop_url = None
+        
+        if movie_details.get('poster_path'):
+            poster_url = tmdb_client.get_image_url(movie_details['poster_path'])
+            logger.info(f"Using poster from '{movie_details.get('title', 'Unknown')}' for collection '{collection_name}'")
+            
+        if movie_details.get('backdrop_path'):
+            backdrop_url = tmdb_client.get_image_url(movie_details['backdrop_path'])
+            logger.info(f"Using backdrop from '{movie_details.get('title', 'Unknown')}' for collection '{collection_name}'")
+            
+        return poster_url, backdrop_url
+        
+    except Exception as e:
+        logger.error(f"Error fetching artwork for movie ID {selected_movie_id}: {e}")
+        return None, None
+
 def _sync_collection(server_client, collection_name, tmdb_ids):
     """
     Sync a collection to a media server. Creates the collection if it doesn't exist,
@@ -285,16 +452,85 @@ def load_custom_lists(file_path: str) -> List[Dict[str, Any]]:
         logger.error(f"Failed to load custom lists from '{file_path}': {e}")
         return []
 
-def process_custom_list(list_info: Dict[str, Any], tmdb_client: TmdbClient, emby_client=None) -> None:
+def process_custom_list(list_info: Dict[str, Any], tmdb_client: TmdbClient, trakt_client: TraktClient = None, emby_client=None) -> None:
     """
     Process a custom list definition and create/update a collection.
+    Supports TMDb IDs, Trakt list references, and mixed content.
     
     Args:
         list_info: Dictionary containing list information
         tmdb_client: TMDb client instance
-        emby_client: Emby client instance (for future implementation)
+        trakt_client: Trakt client instance (optional)
+        emby_client: Emby client instance
     """
-    logger.error("Custom lists feature is not currently supported for Emby")
+    if not emby_client:
+        logger.error("Custom lists feature requires a media server client")
+        return
+        
+    collection_name = list_info.get('name')
+    if not collection_name:
+        logger.error("Custom list missing 'name' field")
+        return
+        
+    logger.info(f"Processing custom list: {collection_name}")
+    
+    tmdb_ids = []
+    items = list_info.get('items', [])
+    
+    for item in items:
+        if isinstance(item, int):
+            # Direct TMDb ID
+            tmdb_ids.append(item)
+        elif isinstance(item, dict):
+            # Object with various identification methods
+            if 'id' in item:
+                tmdb_ids.append(item['id'])
+            elif 'trakt_list' in item and trakt_client:
+                # Reference to a Trakt list
+                trakt_list_params = item['trakt_list']
+                username = trakt_list_params.get('username')
+                list_slug = trakt_list_params.get('list_slug')
+                
+                if username and list_slug:
+                    logger.info(f"Fetching movies from Trakt list: {username}/{list_slug}")
+                    trakt_items = trakt_client.get_list_items(username, list_slug, 'movies')
+                    list_tmdb_ids = trakt_client.extract_tmdb_ids(trakt_items, 'movie')
+                    tmdb_ids.extend(list_tmdb_ids)
+                else:
+                    logger.warning(f"Invalid Trakt list reference in custom list item: {item}")
+            elif 'trakt_watchlist' in item and trakt_client:
+                # Reference to a user's Trakt watchlist
+                username = item['trakt_watchlist'].get('username', 'me')
+                logger.info(f"Fetching movies from Trakt watchlist: {username}")
+                trakt_items = trakt_client.get_watchlist(username, 'movies')
+                list_tmdb_ids = trakt_client.extract_tmdb_ids(trakt_items, 'movie')
+                tmdb_ids.extend(list_tmdb_ids)
+            elif 'imdb_id' in item:
+                # TODO: Add IMDb ID to TMDb ID conversion if needed
+                logger.warning(f"IMDb ID conversion not yet implemented: {item}")
+            else:
+                logger.warning(f"Unrecognized item format in custom list: {item}")
+        else:
+            logger.warning(f"Invalid item type in custom list: {type(item)}")
+    
+    # Remove duplicates while preserving order
+    unique_tmdb_ids = list(dict.fromkeys(tmdb_ids))
+    
+    if not unique_tmdb_ids:
+        logger.warning(f"No valid TMDb IDs found for custom list '{collection_name}'")
+        return
+        
+    logger.info(f"Found {len(unique_tmdb_ids)} unique movies for custom list '{collection_name}'")
+    
+    # Create/update the collection
+    try:
+        collection_id = _sync_collection(emby_client, collection_name, unique_tmdb_ids)
+        if collection_id:
+            logger.info(f"Successfully processed custom list '{collection_name}'")
+        else:
+            logger.error(f"Failed to sync custom list '{collection_name}'")
+    except Exception as e:
+        logger.error(f"Error processing custom list '{collection_name}': {e}")
 
 if __name__ == '__main__':
     main()

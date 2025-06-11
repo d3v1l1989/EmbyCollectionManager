@@ -19,8 +19,11 @@ COPY config/ ./config/
 COPY resources/ ./resources/
 COPY docker_test_resources.py ./
 
-# Expose config volume for mounting secrets/configs
-VOLUME ["/app/config"]
+# Create traktlists directory for user-defined collections
+RUN mkdir -p /app/traktlists
+
+# Expose volumes for mounting configs and user lists
+VOLUME ["/app/config", "/app/traktlists"]
 
 # Add entrypoint script
 COPY entrypoint.sh /entrypoint.sh
