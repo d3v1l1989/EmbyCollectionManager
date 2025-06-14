@@ -282,11 +282,10 @@ class EmbyClient(MediaServerClient):
 
     def update_collection_items(self, collection_id: str, item_ids: List[str]) -> bool:
         """
-        Set the items for a given Emby collection, applying custom sort order.
-        The item_ids list should be in the desired final sort order.
+        Set the items for a given Emby collection.
         Args:
             collection_id: The Emby collection ID.
-            item_ids: List of Emby item IDs to include in the collection, in the desired sort order.
+            item_ids: List of Emby item IDs to include in the collection.
         Returns:
             True if successful, False otherwise.
         """
@@ -301,7 +300,7 @@ class EmbyClient(MediaServerClient):
         
         # 1. Add/Update items in the collection
         # First, ensure we have no duplicate IDs which could cause issues
-        unique_item_ids = list(dict.fromkeys(item_ids))  # Preserve order while removing duplicates
+        unique_item_ids = list(dict.fromkeys(item_ids))  # Remove duplicates
         
         if len(unique_item_ids) < len(item_ids):
             logger.info(f"Removed {len(item_ids) - len(unique_item_ids)} duplicate item IDs from collection update")
@@ -319,69 +318,7 @@ class EmbyClient(MediaServerClient):
             if response.status_code == 204: # 204 No Content is success
                 logger.info(f"Successfully set items in collection {collection_id}.")
 
-                # 2. Set and VERIFY the Collection's DisplayOrder to "SortName"
-                
-                # Initialize update_response to None to track if we attempted the update
-                update_response = None
-                display_order_update_attempted = False
-                
-                # First, get the current collection data to ensure we have all required fields
-                # This is necessary because the API requires a 'source' parameter and other fields
-                collection_data = self._make_api_request('GET', f"/Users/{self.user_id}/Items/{collection_id}")
-                
-                if not collection_data:
-                    logger.error(f"Failed to fetch collection data for ID: {collection_id}")
-                    # Continue anyway to try setting SortNames for items
-                else:
-                    # Start with all existing data and modify what we need
-                    collection_metadata_payload = collection_data.copy()
-                    
-                    # Set the DisplayOrder to PremiereDate in descending order
-                    collection_metadata_payload["DisplayOrder"] = "PremiereDate"
-                    collection_metadata_payload["SortOrder"] = "Descending"
-                    collection_metadata_payload["SortBy"] = "PremiereDate"
-                    
-                    # Auxiliary sort fields (SortByPremiereDate, SortByPremiereFirst) removed 
-                    # to rely on core DisplayOrder, SortOrder, and SortBy fields.
-                    if "SortByPremiereDate" in collection_metadata_payload:
-                        del collection_metadata_payload["SortByPremiereDate"]
-                    if "SortByPremiereFirst" in collection_metadata_payload:
-                        del collection_metadata_payload["SortByPremiereFirst"]
-                    
-                    # Ensure LockedFields allows DisplayOrder and SortBy to be changed
-                    locked_fields = collection_metadata_payload.get('LockedFields') if isinstance(collection_metadata_payload.get('LockedFields'), list) else []
-                    locked_fields = [field for field in locked_fields if field not in ['DisplayOrder', 'SortBy']]
-                    collection_metadata_payload['LockedFields'] = locked_fields
-                    
-                    # Send the update to the collection
-                    collection_item_update_url = f"{self.server_url}/Items/{collection_id}?api_key={self.api_key}"
-                    update_response = self.session.post(collection_item_update_url, json=collection_metadata_payload, timeout=30)
-                    display_order_update_attempted = True
-                
-                # Only perform verification if we attempted the update
-                if display_order_update_attempted and update_response and update_response.status_code in [200, 204]:
-                    # *** IMMEDIATE VERIFICATION ***
-                    verification_url = f"{self.server_url}/Users/{self.user_id}/Items/{collection_id}?api_key={self.api_key}&Fields=DisplayOrder,SortOrder,Name"
-                    verify_data = self._make_api_request('GET', f"/Users/{self.user_id}/Items/{collection_id}", params={'Fields': 'DisplayOrder,SortOrder,Name'})
-
-                    if verify_data and 'DisplayOrder' in verify_data:
-                        actual_display_order = verify_data['DisplayOrder']
-                        actual_sort_order = verify_data.get('SortOrder', 'Unknown')
-                        if actual_display_order != "PremiereDate" or actual_sort_order != "Descending":
-                            logger.critical(f"CRITICAL: Collection sort settings did NOT apply! Expected 'PremiereDate/Descending', got '{actual_display_order}/{actual_sort_order}'. This may affect collection sorting.")
-                    else:
-                        logger.warning(f"Could not verify collection DisplayOrder. Response: {verify_data}")
-                elif display_order_update_attempted and update_response:
-                    logger.error(f"FAILED to set collection DisplayOrder to SortName. Status: {update_response.status_code} - {update_response.text[:200]}")
-                elif display_order_update_attempted:
-                    logger.error(f"FAILED to set collection DisplayOrder to SortName. No response received.")
-                else:
-                    logger.warning(f"Could not attempt to set collection DisplayOrder due to missing collection data.")
-                    
-                # No need to set individual item sort names as we're using year-based sorting now
-                logger.info(f"Using year-based descending order for collection {collection_id} items.")
-                
-                                # Optional: Trigger a refresh on the collection
+                # Optional: Trigger a refresh on the collection
                 try:
                     refresh_url = f"{self.server_url}/Items/{collection_id}/Refresh?api_key={self.api_key}"
                     refresh_response = self.session.post(refresh_url, timeout=30)
@@ -474,9 +411,11 @@ class EmbyClient(MediaServerClient):
                 
             # First, determine the collection's category_id and check if it's a franchise collection
             collection_name = None
-            category_id = None
+            # Note: category_id parameter might be provided, don't reset it to None
+            received_category_id = category_id  # Save the parameter value
             is_franchise = False
             template_name = None
+            logger.info(f"update_collection_artwork called with category_id: {received_category_id}")
             
             # Make sure we have collection data with name
             if not collection_data or 'Name' not in collection_data:
@@ -500,7 +439,10 @@ class EmbyClient(MediaServerClient):
                     recipes_file_path = os.path.join(script_dir, 'src', 'collection_recipes.py')
                     
                     # Use provided category_id if available, otherwise look it up
-                    if category_id is None:
+                    if received_category_id is not None:
+                        category_id = received_category_id
+                        logger.info(f"Using provided category_id {category_id} for collection '{collection_name}'")
+                    elif category_id is None:
                         # First try to import directly
                         if script_dir not in sys.path:
                             sys.path.append(script_dir)
@@ -516,8 +458,6 @@ class EmbyClient(MediaServerClient):
                                     break
                         except (ImportError, ModuleNotFoundError) as e:
                             logger.warning(f"Could not import COLLECTION_RECIPES directly: {e}")
-                    else:
-                        logger.info(f"Using provided category_id {category_id} for collection '{collection_name}'")
                     
                     # If we found a category_id, check if it's a franchise collection
                     if category_id is not None:
