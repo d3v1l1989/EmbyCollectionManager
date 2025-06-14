@@ -88,6 +88,7 @@ def get_poster_template_for_collection(
     # Add debug logging
     logger.info(f"Finding poster template for collection: '{collection_name}'")
     logger.info(f"Category map has {len(category_poster_map)} categories: {list(category_poster_map.keys())}")
+    logger.info(f"Provided category_id: {category_id}")
     
     # Check if we have a valid category ID
     if category_id is None:
@@ -100,6 +101,7 @@ def get_poster_template_for_collection(
     # Get the template directly from the category_poster_map which contains the CATEGORY_CONFIG from collection_recipes.py
     # This ensures we're using the official mapping from the config file
     category_info = category_poster_map.get(category_number)
+    logger.info(f"Category info for {category_number}: {category_info}")
     
     if not category_info:
         # Fallback to default poster if no template assigned to category

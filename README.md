@@ -48,18 +48,17 @@ emby:
   server_url: "http://emby:8096"  # Use your actual server address
   user_id: "YOUR_EMBY_USER_ID"
 
-# Trakt configuration (optional)
+# Trakt configuration (optional - see "Getting API Keys" section below)
 trakt:
-  client_id: "YOUR_TRAKT_CLIENT_ID"
-  client_secret: "YOUR_TRAKT_CLIENT_SECRET"
-  access_token: "YOUR_TRAKT_ACCESS_TOKEN"  # Optional
+  client_id: "YOUR_TRAKT_CLIENT_ID"      # Get from trakt.tv/oauth/applications
+  client_secret: "YOUR_TRAKT_CLIENT_SECRET"  # Get from trakt.tv/oauth/applications
 
 # Trakt lists configuration
 traktlists:
   enabled: true                          # Enable/disable Trakt list processing
   directory: "traktlists"                # Directory to scan for Trakt list files
   random_poster: true                    # Use random movie poster from collection
-  max_items_per_collection: 100          # Maximum items per collection
+  max_items_per_collection: 0            # Maximum items per collection (0 = no limit)
 
 # Custom poster generation settings
 poster_settings:
@@ -157,15 +156,6 @@ If you prefer to run without Docker:
    ```sh
    python -m src.app_logic --targets auto
    ```
-
-## 🎯 Controlling Sync Target
-
-Use the `SYNC_TARGET` environment variable (for Docker) or the `--targets` command-line flag (for direct Python usage):
-
-- **`auto`**: Auto-detect and use Emby if configured (default)
-- **`emby`**: Sync to Emby
-
-Legacy approach (still supported): You can also use `SYNC_EMBY=1` environment variable.
 
 ## 🔄 Advanced Usage
 
@@ -275,6 +265,11 @@ TMDbCollector automatically adds artwork to your collections:
 
 - **TMDb**: Register at [themoviedb.org](https://www.themoviedb.org/settings/api) to get a free API key
 - **Emby**: Get your API key from Emby Dashboard → Advanced → Security
+- **Trakt** (optional, for Trakt list support):
+  1. Go to [trakt.tv/oauth/applications](https://trakt.tv/oauth/applications)
+  2. Create a new application (name it whatever you want)
+  3. Copy the **Client ID** - this is all you need for public lists
+  4. For private lists/authentication, you'll also need the **Client Secret**
 
 ---
 

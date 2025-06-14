@@ -158,7 +158,7 @@ class TraktClient:
     
     def get_list_items(self, username: str, list_slug: str, item_type: str = 'movies') -> List[Dict]:
         """
-        Get items from a specific user list.
+        Get all items from a specific user list using pagination.
         
         Args:
             username: Trakt username or 'me' for authenticated user
@@ -166,17 +166,43 @@ class TraktClient:
             item_type: Type of items to fetch ('movies', 'shows', 'all')
             
         Returns:
-            List of items with metadata
+            List of all items with metadata
         """
         endpoint = f"/users/{username}/lists/{list_slug}/items"
+        all_items = []
+        page = 1
+        limit = 100  # Use 100 items per page for efficiency
         
-        # Add type filter if specified
-        params = {}
-        if item_type != 'all':
-            params['type'] = item_type
+        while True:
+            # Add pagination and type filter parameters
+            params = {
+                'page': page,
+                'limit': limit
+            }
+            if item_type != 'all':
+                params['type'] = item_type
             
-        response = self._make_request('GET', endpoint, params=params)
-        return response if response else []
+            self.logger.debug(f"Fetching page {page} for list {username}/{list_slug} (limit: {limit})")
+            response = self._make_request('GET', endpoint, params=params)
+            
+            if not response:
+                break
+                
+            # Check if we got any items
+            if len(response) == 0:
+                break
+                
+            all_items.extend(response)
+            self.logger.debug(f"Got {len(response)} items from page {page}, total so far: {len(all_items)}")
+            
+            # If we got fewer items than the limit, we've reached the end
+            if len(response) < limit:
+                break
+                
+            page += 1
+        
+        self.logger.info(f"Retrieved {len(all_items)} total items from list {username}/{list_slug}")
+        return all_items
     
     def get_watchlist(self, username: str = 'me', item_type: str = 'movies') -> List[Dict]:
         """

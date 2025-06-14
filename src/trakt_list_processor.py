@@ -36,7 +36,7 @@ class TraktListProcessor:
         traktlists_config = self.config.get('traktlists', {})
         self.enabled = traktlists_config.get('enabled', True)
         self.directory = traktlists_config.get('directory', 'traktlists')
-        self.max_items = traktlists_config.get('max_items_per_collection', 100)
+        self.max_items = traktlists_config.get('max_items_per_collection', 0)
         
     def is_enabled(self) -> bool:
         """Check if Trakt list processing is enabled."""
