@@ -90,7 +90,6 @@ class EmbyClient(MediaServerClient):
                                     # The method is DELETE, not POST, and IDs are passed in query string.
                                     remove_url = f"{self.server_url}/Collections/{new_collection_id}/Items?api_key={self.api_key}&Ids={sample_item_id}"
                                     logger.info(f"Removing temporary item {sample_item_id} from collection {new_collection_id}...")
-                                    # remove_response = self.session.post(remove_url, timeout=15) # Original was POST
                                     remove_response = self.session.delete(remove_url, timeout=15) # Correct method is DELETE
 
                                     # Successful deletion usually returns 204 No Content
@@ -406,7 +405,6 @@ class EmbyClient(MediaServerClient):
             logger.error(f"Error updating collection items: {e}")
             return False
 
-    # Removed methods related to custom sorting since we're now using year-based sorting
     
     def update_collection_artwork(self, collection_id: str, poster_url: Optional[str]=None, backdrop_url: Optional[str]=None) -> bool:
         """

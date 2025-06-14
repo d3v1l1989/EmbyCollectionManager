@@ -9,7 +9,6 @@ class TmdbClient:
         self.api_key = api_key
         self.logger = logging.getLogger("TmdbClient")
         self.session = requests.Session()
-        # self.session.params = {"api_key": self.api_key} # Removed: API key will be added per-request
 
     def discover_movies(self, params, page_limit=1):
         """

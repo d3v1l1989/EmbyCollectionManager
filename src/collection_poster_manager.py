@@ -77,7 +77,6 @@ def generate_poster_for_collection(
         recipes_file_path=recipes_file_path,
         category_id=category_number
     )
-    logger.info(f"[DOCKER DEBUG] Template name from mapper: {template_name}")
     
     # IMPORTANT FIX: Don't return None if no template found, let the poster generator use default
     if not template_name:
@@ -87,17 +86,10 @@ def generate_poster_for_collection(
     # Check if the template exists
     templates_dir = os.path.join(resources_dir, "templates")
     
-    # Log available templates for debugging
-    try:
-        available_templates = os.listdir(templates_dir)
-        logger.info(f"[DOCKER DEBUG] Available templates in {templates_dir}: {available_templates}")
-    except Exception as e:
-        logger.error(f"[DOCKER DEBUG] Error listing templates: {e}")
     
     if template_name:
         template_path = os.path.join(templates_dir, template_name)
         template_exists = os.path.exists(template_path)
-        logger.info(f"[DOCKER DEBUG] Template path: {template_path}, exists: {template_exists}")
         
         if not template_exists:
             logger.warning(f"Template file not found: {template_path}, will use default")
@@ -119,51 +111,3 @@ def generate_poster_for_collection(
         logger.error(f"Failed to generate poster for collection '{collection_name}'")
         return None
 
-def generate_posters_for_all_collections(
-    collection_recipes: List[Dict],
-    recipes_file_path: str,
-    resources_dir: str
-) -> Dict[str, str]:
-    """
-    Generate posters for all collections in the recipes list.
-    
-    Args:
-        collection_recipes: List of collection recipe dictionaries
-        recipes_file_path: Path to the collection_recipes.py file
-        resources_dir: Path to the resources directory
-        
-    Returns:
-        Dictionary mapping collection names to poster file paths
-    """
-    # Clean up old temporary posters first
-    cleanup_count = cleanup_temp_posters()
-    if cleanup_count > 0:
-        logger.info(f"Cleaned up {cleanup_count} old temporary poster files")
-    
-    # Extract categories once to avoid repeated parsing
-    category_poster_map = parse_collection_categories(recipes_file_path)
-    logger.info(f"Found {len(category_poster_map)} categories with poster assignments")
-    
-    # Generate posters for each collection
-    poster_map = {}
-    for recipe in collection_recipes:
-        collection_name = recipe.get("name")
-        if not collection_name:
-            continue
-            
-        # Extract category_id directly from the recipe if available
-        category_id = recipe.get("category_id")
-        
-        poster_path = generate_poster_for_collection(
-            collection_name=collection_name,
-            recipes_file_path=recipes_file_path,
-            resources_dir=resources_dir,
-            category_poster_map=category_poster_map,
-            category_id=category_id
-        )
-        
-        if poster_path:
-            poster_map[collection_name] = poster_path
-    
-    logger.info(f"Generated {len(poster_map)} posters for collections")
-    return poster_map
