@@ -320,7 +320,6 @@ class EmbyClient(MediaServerClient):
                 logger.info(f"Successfully set items in collection {collection_id}.")
 
                 # 2. Set and VERIFY the Collection's DisplayOrder to "SortName"
-                logger.info(f"Attempting to set collection {collection_id} DisplayOrder to PremiereDate (SortOrder: Descending)...")
                 
                 # Initialize update_response to None to track if we attempted the update
                 update_response = None
@@ -355,15 +354,12 @@ class EmbyClient(MediaServerClient):
                     collection_metadata_payload['LockedFields'] = locked_fields
                     
                     # Send the update to the collection
-                    logger.info(f"Collection metadata update payload for {collection_id}: {collection_metadata_payload}")
                     collection_item_update_url = f"{self.server_url}/Items/{collection_id}?api_key={self.api_key}"
                     update_response = self.session.post(collection_item_update_url, json=collection_metadata_payload, timeout=30)
                     display_order_update_attempted = True
                 
                 # Only perform verification if we attempted the update
                 if display_order_update_attempted and update_response and update_response.status_code in [200, 204]:
-                    logger.info(f"Attempt to set collection DisplayOrder to PremiereDate (SortOrder: Descending) successful (HTTP {update_response.status_code}). Verifying...")
-                    
                     # *** IMMEDIATE VERIFICATION ***
                     verification_url = f"{self.server_url}/Users/{self.user_id}/Items/{collection_id}?api_key={self.api_key}&Fields=DisplayOrder,SortOrder,Name"
                     verify_data = self._make_api_request('GET', f"/Users/{self.user_id}/Items/{collection_id}", params={'Fields': 'DisplayOrder,SortOrder,Name'})
@@ -371,7 +367,6 @@ class EmbyClient(MediaServerClient):
                     if verify_data and 'DisplayOrder' in verify_data:
                         actual_display_order = verify_data['DisplayOrder']
                         actual_sort_order = verify_data.get('SortOrder', 'Unknown')
-                        logger.info(f"VERIFIED: Collection '{verify_data.get('Name')}' (ID: {collection_id}) is using sorting by {actual_display_order} in {actual_sort_order} order")
                         if actual_display_order != "PremiereDate" or actual_sort_order != "Descending":
                             logger.critical(f"CRITICAL: Collection sort settings did NOT apply! Expected 'PremiereDate/Descending', got '{actual_display_order}/{actual_sort_order}'. This may affect collection sorting.")
                     else:
@@ -406,7 +401,7 @@ class EmbyClient(MediaServerClient):
             return False
 
     
-    def update_collection_artwork(self, collection_id: str, poster_url: Optional[str]=None, backdrop_url: Optional[str]=None) -> bool:
+    def update_collection_artwork(self, collection_id: str, poster_url: Optional[str]=None, backdrop_url: Optional[str]=None, category_id: Optional[int]=None) -> bool:
         """
         Update artwork for an Emby collection using external image URLs.
         Order of poster selection:
@@ -419,6 +414,7 @@ class EmbyClient(MediaServerClient):
             collection_id: The Emby collection ID
             poster_url: URL to collection poster image
             backdrop_url: URL to collection backdrop/fanart image
+            category_id: Optional category ID to determine poster template (overrides recipe lookup)
             
         Returns:
             True if at least one image was successfully updated, False otherwise
@@ -492,6 +488,7 @@ class EmbyClient(MediaServerClient):
                 logger.info(f"Processing collection: '{collection_name}'")
                 
                 # Look up category_id for this collection from collection_recipes.py
+                # Unless category_id was provided as parameter
                 try:
                     # Get the path to collection_recipes.py
                     if hasattr(self, 'config') and 'script_dir' in self.config:
@@ -502,21 +499,25 @@ class EmbyClient(MediaServerClient):
                         
                     recipes_file_path = os.path.join(script_dir, 'src', 'collection_recipes.py')
                     
-                    # First try to import directly
-                    if script_dir not in sys.path:
-                        sys.path.append(script_dir)
-                        
-                    try:
-                        from src.collection_recipes import COLLECTION_RECIPES
-                        
-                        # Find this collection in the COLLECTION_RECIPES list
-                        for recipe in COLLECTION_RECIPES:
-                            if recipe.get('name') == collection_name and 'category_id' in recipe:
-                                category_id = recipe['category_id']
-                                logger.info(f"Found category_id {category_id} for collection '{collection_name}'")
-                                break
-                    except (ImportError, ModuleNotFoundError) as e:
-                        logger.warning(f"Could not import COLLECTION_RECIPES directly: {e}")
+                    # Use provided category_id if available, otherwise look it up
+                    if category_id is None:
+                        # First try to import directly
+                        if script_dir not in sys.path:
+                            sys.path.append(script_dir)
+                            
+                        try:
+                            from src.collection_recipes import COLLECTION_RECIPES
+                            
+                            # Find this collection in the COLLECTION_RECIPES list
+                            for recipe in COLLECTION_RECIPES:
+                                if recipe.get('name') == collection_name and 'category_id' in recipe:
+                                    category_id = recipe['category_id']
+                                    logger.info(f"Found category_id {category_id} for collection '{collection_name}'")
+                                    break
+                        except (ImportError, ModuleNotFoundError) as e:
+                            logger.warning(f"Could not import COLLECTION_RECIPES directly: {e}")
+                    else:
+                        logger.info(f"Using provided category_id {category_id} for collection '{collection_name}'")
                     
                     # If we found a category_id, check if it's a franchise collection
                     if category_id is not None:

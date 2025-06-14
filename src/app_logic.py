@@ -104,6 +104,60 @@ def main():
         logger.error("No media server available for sync. Check your configuration and target selection.")
         sys.exit(1)
 
+    # Process Trakt lists from traktlists directory FIRST for testing
+    try:
+        trakt_processor = TraktListProcessor(tmdb, trakt, config)
+        trakt_collections = trakt_processor.scan_traktlists_directory()
+        
+        if trakt_collections:
+            logger.info(f"Processing {len(trakt_collections)} Trakt list collections")
+            
+            for collection_info in trakt_collections:
+                try:
+                    collection_name = collection_info['name']
+                    tmdb_ids = collection_info['tmdb_ids']
+                    
+                    if not tmdb_ids:
+                        logger.warning(f"No movies found for Trakt collection '{collection_name}', skipping")
+                        continue
+                    
+                    logger.info(f"Processing Trakt collection: {collection_name}")
+                    
+                    if emby:
+                        collection_id = _sync_collection(emby, collection_name, tmdb_ids)
+                        
+                        if collection_id:
+                            # Use custom poster generation for Trakt collections
+                            # Pass category_id to enable proper template selection
+                            category_id = collection_info.get('category_id', 12)  # Default to Trakt category
+                            backdrop_url = None
+                            
+                            # Get backdrop from a random movie in the collection
+                            if tmdb_ids:
+                                try:
+                                    representative_movie_id = random.choice(tmdb_ids)
+                                    movie_details = tmdb.get_movie_details(representative_movie_id)
+                                    if movie_details and movie_details.get('backdrop_path'):
+                                        backdrop_url = tmdb.get_image_url(movie_details['backdrop_path'])
+                                        logger.info(f"Using backdrop from movie ID {representative_movie_id} for Trakt collection '{collection_name}'")
+                                except Exception as e:
+                                    logger.warning(f"Could not fetch backdrop for Trakt collection '{collection_name}': {e}")
+                            
+                            # EmbyClient will handle poster generation using category_id and trakt.png template
+                            logger.info(f"Applying custom poster to Trakt collection '{collection_name}' (category_id: {category_id})")
+                            if emby.update_collection_artwork(collection_id, None, backdrop_url, category_id=category_id):
+                                logger.info(f"Successfully updated artwork for Trakt collection '{collection_name}'")
+                            else:
+                                logger.warning(f"Failed to update artwork for Trakt collection '{collection_name}'")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing Trakt collection '{collection_info.get('name', 'Unknown')}': {e}")
+        else:
+            logger.info("No Trakt list collections found to process")
+            
+    except Exception as e:
+        logger.error(f"Error during Trakt list processing: {e}")
+
     # Process standard TMDb collections from recipes
     for recipe in RECIPES:
         # Check if this recipe's targets include our active server
@@ -303,48 +357,6 @@ def main():
                 list_name = list_info.get('name', 'Unknown')
                 logger.error(f"Error processing custom list '{list_name}': {e}")
 
-    # Process Trakt lists from traktlists directory
-    try:
-        trakt_processor = TraktListProcessor(tmdb, trakt, config)
-        trakt_collections = trakt_processor.scan_traktlists_directory()
-        
-        if trakt_collections:
-            logger.info(f"Processing {len(trakt_collections)} Trakt list collections")
-            
-            for collection_info in trakt_collections:
-                try:
-                    collection_name = collection_info['name']
-                    tmdb_ids = collection_info['tmdb_ids']
-                    
-                    if not tmdb_ids:
-                        logger.warning(f"No movies found for Trakt collection '{collection_name}', skipping")
-                        continue
-                    
-                    logger.info(f"Processing Trakt collection: {collection_name}")
-                    
-                    if emby:
-                        collection_id = _sync_collection(emby, collection_name, tmdb_ids)
-                        
-                        if collection_id:
-                            # Use random movie poster for Trakt collections
-                            poster_url, backdrop_url = get_random_movie_artwork(tmdb, tmdb_ids, collection_name)
-                            
-                            if poster_url or backdrop_url:
-                                logger.info(f"Applying random movie artwork to Trakt collection '{collection_name}'")
-                                if emby.update_collection_artwork(collection_id, poster_url, backdrop_url):
-                                    logger.info(f"Successfully updated artwork for Trakt collection '{collection_name}'")
-                                else:
-                                    logger.warning(f"Failed to update artwork for Trakt collection '{collection_name}'")
-                            else:
-                                logger.info(f"No artwork found for Trakt collection '{collection_name}'")
-                        
-                except Exception as e:
-                    logger.error(f"Error processing Trakt collection '{collection_info.get('name', 'Unknown')}': {e}")
-        else:
-            logger.info("No Trakt list collections found to process")
-            
-    except Exception as e:
-        logger.error(f"Error during Trakt list processing: {e}")
 
 def get_random_movie_artwork(tmdb_client, tmdb_ids, collection_name):
     """

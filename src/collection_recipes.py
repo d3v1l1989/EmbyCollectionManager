@@ -16,7 +16,7 @@ CATEGORY_CONFIG = {
     9: {"name": "ADDITIONAL THEME & KEYWORD COLLECTIONS", "poster": "themes.jpg"},
     10: {"name": "STUDIO COLLECTIONS", "poster": "studio.jpg"},
     11: {"name": "LANGUAGE & REGIONAL CINEMA", "poster": "languages.jpg"},
-    12: {"name": "TRAKT COLLECTIONS", "poster": "default.png"}
+    12: {"name": "TRAKT COLLECTIONS", "poster": "trakt.png"}
 }
 
 COLLECTION_RECIPES: List[Dict[str, Any]] = [
