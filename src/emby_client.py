@@ -268,9 +268,17 @@ class EmbyClient(MediaServerClient):
         from difflib import SequenceMatcher
         
         # Get TMDb client to fetch movie details
-        from .config_loader import load_config
-        config = load_config()
-        tmdb_api_key = config.get('tmdb', {}).get('api_key') or os.getenv('TMDB_API_KEY')
+        tmdb_api_key = os.getenv('TMDB_API_KEY')
+        
+        # Try to get from config file if available
+        try:
+            from .app_logic import load_config
+            config_path = os.getenv('CONFIG_PATH', '/app/config/config.yaml')
+            if os.path.exists(config_path):
+                config = load_config(config_path)
+                tmdb_api_key = config.get('tmdb', {}).get('api_key') or tmdb_api_key
+        except (ImportError, FileNotFoundError, Exception):
+            pass  # Fallback to environment variable
         if not tmdb_api_key:
             logger.warning("No TMDb API key available for title fallback matching")
             return []
