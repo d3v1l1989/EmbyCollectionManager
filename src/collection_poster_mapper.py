@@ -43,17 +43,15 @@ def load_category_config(recipes_file_path: str) -> Dict[int, Dict[str, str]]:
         # Get the CATEGORY_CONFIG dictionary
         if hasattr(module, 'CATEGORY_CONFIG'):
             category_config = module.CATEGORY_CONFIG
-            logger.info(f"Successfully loaded CATEGORY_CONFIG with {len(category_config)} categories")
+            logger.debug(f"Successfully loaded CATEGORY_CONFIG with {len(category_config)} categories")
             
             # Fix any tmdb.jpg references to use tmdb.png instead
             for cat_id, cat_info in category_config.items():
                 if cat_info.get('poster') == 'tmdb.jpg':
                     cat_info['poster'] = 'tmdb.png'
-                    logger.info(f"Updated template for category {cat_id} from 'tmdb.jpg' to 'tmdb.png'")
+                    logger.debug(f"Updated template for category {cat_id} from 'tmdb.jpg' to 'tmdb.png'")
                     
-            # Log loaded categories for debugging
-            for cat_id, cat_info in category_config.items():
-                logger.info(f"Category {cat_id}: '{cat_info.get('name')}' uses template '{cat_info.get('poster')}'")    
+            # Categories loaded successfully (verbose logging moved to debug level)    
                 
             return category_config
         else:
@@ -85,10 +83,8 @@ def get_poster_template_for_collection(
     Returns:
         Poster template filename or None if not applicable/found
     """
-    # Add debug logging
-    logger.info(f"Finding poster template for collection: '{collection_name}'")
-    logger.info(f"Category map has {len(category_poster_map)} categories: {list(category_poster_map.keys())}")
-    logger.info(f"Provided category_id: {category_id}")
+    # Debug logging (moved to debug level)
+    logger.debug(f"Finding poster template for collection: '{collection_name}' (category_id: {category_id})")
     
     # Check if we have a valid category ID
     if category_id is None:
@@ -96,12 +92,12 @@ def get_poster_template_for_collection(
         return "default.png"
     
     category_number = category_id
-    logger.info(f"Using category ID {category_id} for collection '{collection_name}'")
+    logger.debug(f"Using category ID {category_id} for collection '{collection_name}'")
     
     # Get the template directly from the category_poster_map which contains the CATEGORY_CONFIG from collection_recipes.py
     # This ensures we're using the official mapping from the config file
     category_info = category_poster_map.get(category_number)
-    logger.info(f"Category info for {category_number}: {category_info}")
+    logger.debug(f"Category info for {category_number}: {category_info}")
     
     if not category_info:
         # Fallback to default poster if no template assigned to category

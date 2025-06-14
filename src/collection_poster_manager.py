@@ -62,13 +62,13 @@ def generate_poster_for_collection(
     # Add logging for collection poster generation
     logger.info(f"Generating poster for collection: '{collection_name}'")
     logger.info(f"Resources directory: {resources_dir}")
-    logger.info(f"Category map has {len(category_poster_map) if category_poster_map else 0} entries")
+    logger.debug(f"Category map has {len(category_poster_map) if category_poster_map else 0} entries")
     
     # Log the category ID we're using
-    logger.info(f"Using category_id: {category_id}")
+    logger.debug(f"Using category_id: {category_id}")
     
     if category_id and category_id in category_poster_map:
-        logger.info(f"Category {category_id} maps to: {category_poster_map[category_id]}")
+        logger.debug(f"Category {category_id} maps to: {category_poster_map[category_id]}")
     
     # Get the appropriate template for this collection
     template_name = get_poster_template_for_collection(
