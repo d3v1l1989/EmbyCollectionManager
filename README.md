@@ -58,7 +58,6 @@ trakt:
 traktlists:
   enabled: true                          # Enable/disable Trakt list processing
   directory: "traktlists"                # Directory to scan for Trakt list files
-  random_poster: true                    # Use random movie poster from collection
   max_items_per_collection: 0            # Maximum items per collection (0 = no limit)
 
 # MDBList configuration (optional - for MDBList.com integration)
@@ -248,7 +247,7 @@ https://trakt.tv/users/username/lists/my-list
 
 #### Trakt Features
 
-- **🎲 Random Posters**: Each collection gets a poster from a randomly selected movie
+- **🎨 Custom Generated Posters**: Each collection gets a custom branded poster template
 - **📁 Simple Organization**: One file = one collection (filename becomes collection name)
 - **🔄 Automatic Processing**: Collections are created/updated every time the app runs
 - **⚙️ Configurable**: Control via `traktlists` section in config.yaml
@@ -303,7 +302,7 @@ Emby Collection Manager automatically adds artwork to your collections:
 
 - 🖼️ For franchise collections: Uses official TMDb collection artwork
 - 🎨 For dynamic collections (Popular, Genres): Uses artwork from the first movie
-- 🎲 For Trakt list collections: Uses artwork from a randomly selected movie in the collection
+- 🎨 For Trakt list collections: Uses custom branded poster templates with Trakt styling
 - 🎬 For MDBList collections: Uses custom branded poster templates with MDBList styling
 
 ## 🔍 Troubleshooting

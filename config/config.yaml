@@ -20,7 +20,6 @@ trakt:
 traktlists:
   enabled: true                          # Enable/disable Trakt list processing
   directory: "traktlists"                # Directory to scan for Trakt list files
-  random_poster: true                    # Use random movie poster from collection
   max_items_per_collection: 0            # Maximum items per collection (0 = no limit)
 
 # MDBList configuration (optional - see docs for getting API key)
