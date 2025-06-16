@@ -214,8 +214,12 @@ class MDBListClient:
         """
         tmdb_ids = []
         
-        for item in mdblist_items:
+        for i, item in enumerate(mdblist_items):
             try:
+                # Debug: Log the item structure for the first few items
+                if i < 3:
+                    logger.info(f"MDBList item {i+1} structure: {item}")
+                
                 # MDBList items should have TMDb ID directly
                 tmdb_id = None
                 
