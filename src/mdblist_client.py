@@ -126,32 +126,8 @@ class MDBListClient:
             
             logger.debug(f"Fetching page {page_num} (offset: {offset}, limit: {current_batch_size}) for MDBList list: {list_id}")
             
-            # Try different endpoint formats based on common API patterns
-            endpoints_to_try = [
-                f"lists/{list_id}/items",
-                f"lists/{list_id}",  # Original endpoint with items in response
-                f"list/{list_id}/items",  # Alternative singular form
-                f"list/{list_id}",
-            ]
-            
-            response = None
-            for endpoint in endpoints_to_try:
-                logger.debug(f"Trying endpoint: {endpoint}")
-                response = self._make_request(endpoint, params)
-                if response:
-                    logger.info(f"Successful response from endpoint: {endpoint}")
-                    break
-                else:
-                    logger.debug(f"No response from endpoint: {endpoint}")
-            
-            if not response:
-                # Try without offset/limit params which might not be supported
-                logger.debug("Trying without pagination params...")
-                for endpoint in endpoints_to_try:
-                    response = self._make_request(endpoint, {'apikey': self.api_key})
-                    if response:
-                        logger.info(f"Successful response from endpoint (no pagination): {endpoint}")
-                        break
+            # Use the correct MDBList API endpoint format
+            response = self._make_request(f"lists/{list_id}/items", params)
             
             if not response:
                 logger.error(f"Failed to fetch page {page_num} for MDBList list: {list_id}")
@@ -164,11 +140,19 @@ class MDBListClient:
                     logger.info(f"MDBList API response keys: {list(response.keys())}")
                 logger.info(f"MDBList API response (first 200 chars): {str(response)[:200]}...")
             
-            # Handle both response formats: direct list or dict with 'items' key
+            # Handle MDBList API response format: {'movies': [...], 'shows': [...]}
             if isinstance(response, list):
                 items = response
             elif isinstance(response, dict):
-                items = response.get('items', [])
+                # MDBList API returns movies in 'movies' key and shows in 'shows' key
+                movies = response.get('movies', [])
+                shows = response.get('shows', [])
+                
+                # For now, we focus on movies (could extend to shows later)
+                items = movies
+                
+                if page_num == 1 and movies:
+                    logger.info(f"Found {len(movies)} movies and {len(shows)} shows in MDBList response")
             else:
                 logger.error(f"Unexpected response format for MDBList list {list_id}: {type(response)}")
                 break
@@ -256,13 +240,15 @@ class MDBListClient:
                 # MDBList items should have TMDb ID directly
                 tmdb_id = None
                 
-                # Try different possible field names for TMDb ID
-                if 'tmdb_id' in item:
+                # MDBList API format: {'id': 524635, 'title': '...', 'imdb_id': 'tt...', ...}
+                # The 'id' field appears to be the TMDb ID based on the API response structure
+                if 'id' in item:
+                    tmdb_id = item['id']
+                # Also try other possible field names for compatibility
+                elif 'tmdb_id' in item:
                     tmdb_id = item['tmdb_id']
                 elif 'tmdb' in item:
                     tmdb_id = item['tmdb']
-                elif 'id' in item and 'source' in item and item.get('source') == 'tmdb':
-                    tmdb_id = item['id']
                 elif 'tmdb_id' in item.get('ids', {}):
                     tmdb_id = item['ids']['tmdb_id']
                 elif 'tmdb' in item.get('ids', {}):
