@@ -1,0 +1,24 @@
+# Action Movie Favorites
+# Mix of classic and modern action films
+
+# John Wick franchise
+245891  # John Wick
+324552  # John Wick: Chapter 2
+458156  # John Wick: Chapter 3 - Parabellum
+
+# Die Hard series
+562     # Die Hard
+1573    # Die Hard 2
+
+# By movie title
+Mad Max: Fury Road
+The Dark Knight
+Casino Royale
+Mission: Impossible - Fallout
+Top Gun: Maverick
+Heat
+Seven Samurai
+
+# Martial arts classics
+9739    # Enter the Dragon
+11584   # The Raid: Redemption

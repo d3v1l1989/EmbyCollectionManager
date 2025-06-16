@@ -5,6 +5,8 @@ import random
 from src.tmdb_fetcher import TmdbClient
 from src.trakt_client import TraktClient
 from src.trakt_list_processor import TraktListProcessor
+from src.mdblist_client import MDBListClient
+from src.mdblist_processor import MDBListProcessor
 from src.emby_client import EmbyClient
 from src.collection_recipes import RECIPES  # Assumes recipes are defined here
 import yaml
@@ -66,6 +68,18 @@ def main():
         except Exception as e:
             logger.warning(f"Failed to initialize Trakt client: {e}")
             logger.warning("Trakt-based collections will be skipped")
+
+    # Initialize MDBList client if configured
+    mdblist = None
+    if 'mdblist' in config and config['mdblist'].get('api_key'):
+        try:
+            mdblist = MDBListClient(
+                api_key=config['mdblist']['api_key']
+            )
+            logger.info("MDBList client initialized successfully")
+        except Exception as e:
+            logger.warning(f"Failed to initialize MDBList client: {e}")
+            logger.warning("MDBList-based collections will be skipped")
 
     # Determine if we should sync to Emby based on args and available config
     sync_emby = False
@@ -157,6 +171,60 @@ def main():
             
     except Exception as e:
         logger.error(f"Error during Trakt list processing: {e}")
+
+    # Process MDBList collections from mdblists directory
+    try:
+        mdblist_processor = MDBListProcessor(tmdb, mdblist, config)
+        mdblist_collections = mdblist_processor.scan_mdblists_directory()
+        
+        if mdblist_collections:
+            logger.info(f"Processing {len(mdblist_collections)} MDBList collections")
+            
+            for collection_info in mdblist_collections:
+                try:
+                    collection_name = collection_info['name']
+                    tmdb_ids = collection_info['tmdb_ids']
+                    
+                    if not tmdb_ids:
+                        logger.warning(f"No movies found for MDBList collection '{collection_name}', skipping")
+                        continue
+                    
+                    logger.info(f"Processing MDBList collection: {collection_name}")
+                    
+                    if emby:
+                        collection_id = _sync_collection(emby, collection_name, tmdb_ids)
+                        
+                        if collection_id:
+                            # Use custom poster generation for MDBList collections
+                            # Pass category_id to enable proper template selection
+                            category_id = collection_info.get('category_id', 13)  # Default to MDBList category
+                            backdrop_url = None
+                            
+                            # Get backdrop from a random movie in the collection
+                            if tmdb_ids:
+                                try:
+                                    representative_movie_id = random.choice(tmdb_ids)
+                                    movie_details = tmdb.get_movie_details(representative_movie_id)
+                                    if movie_details and movie_details.get('backdrop_path'):
+                                        backdrop_url = tmdb.get_image_url(movie_details['backdrop_path'])
+                                        logger.info(f"Using backdrop from movie ID {representative_movie_id} for MDBList collection '{collection_name}'")
+                                except Exception as e:
+                                    logger.warning(f"Could not fetch backdrop for MDBList collection '{collection_name}': {e}")
+                            
+                            # EmbyClient will handle poster generation using category_id and mdblist.png template
+                            logger.info(f"Applying custom poster to MDBList collection '{collection_name}' (category_id: {category_id})")
+                            if emby.update_collection_artwork(collection_id, None, backdrop_url, category_id=category_id):
+                                logger.info(f"Successfully updated artwork for MDBList collection '{collection_name}'")
+                            else:
+                                logger.warning(f"Failed to update artwork for MDBList collection '{collection_name}'")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing MDBList collection '{collection_info.get('name', 'Unknown')}': {e}")
+        else:
+            logger.info("No MDBList collections found to process")
+            
+    except Exception as e:
+        logger.error(f"Error during MDBList processing: {e}")
 
     # Process standard TMDb collections from recipes
     for recipe in RECIPES:

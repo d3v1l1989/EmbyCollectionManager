@@ -23,6 +23,16 @@ traktlists:
   random_poster: true                    # Use random movie poster from collection
   max_items_per_collection: 0            # Maximum items per collection (0 = no limit)
 
+# MDBList configuration (optional - see docs for getting API key)
+mdblist:
+  api_key: "YOUR MDBLIST API KEY"        # Get from https://mdblist.com/preferences
+
+# MDBList local files configuration
+mdblists:
+  enabled: true                          # Enable/disable MDBList processing
+  directory: "mdblists"                  # Directory to scan for MDBList files
+  max_items_per_collection: 0            # Maximum items per collection (0 = unlimited)
+
 # Custom poster generation settings
 poster_settings:
   # Enable/disable custom poster generation when TMDb doesn't provide one

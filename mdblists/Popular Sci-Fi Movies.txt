@@ -1,0 +1,24 @@
+# Popular Science Fiction Movies Collection
+# This collection combines MDBList data with direct TMDb IDs and movie titles
+
+# Some classic sci-fi movies by TMDb ID
+13    # The Matrix
+550   # Fight Club (not sci-fi but iconic)
+62    # 2001: A Space Odyssey
+78    # Blade Runner
+
+# Movie titles that will be searched on TMDb
+Interstellar
+Inception
+Ex Machina
+Arrival
+Dune
+
+# Example MDBList URL (requires API key to work)
+# https://mdblist.com/lists/scififan/best-sci-fi-movies
+
+# More classics by title
+The Terminator
+Alien
+Star Wars
+E.T. the Extra-Terrestrial
