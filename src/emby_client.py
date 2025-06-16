@@ -132,7 +132,7 @@ class EmbyClient(MediaServerClient):
     def get_library_item_ids_by_tmdb_ids(self, tmdb_ids: List[int]) -> List[str]:
         """
         Given a list of TMDb IDs, return the Emby server's internal item IDs for owned movies.
-        Uses direct provider ID lookup with title-based fallback for enhanced coverage.
+        Uses direct provider ID lookup only for optimal performance.
         
         Args:
             tmdb_ids: List of TMDb movie IDs.
@@ -150,7 +150,7 @@ class EmbyClient(MediaServerClient):
         found_tmdb_ids = set()
         total_to_find = len(tmdb_ids_str)
         
-        logger.info(f"Searching for {total_to_find} TMDb movies using optimized batch lookup...")
+        logger.info(f"Searching for {total_to_find} TMDb movies using direct ID lookup...")
         
         try:
             # Use Emby's AnyProviderIdEquals parameter to directly search for TMDb IDs
@@ -230,193 +230,17 @@ class EmbyClient(MediaServerClient):
                     break
                     
             # Final summary
-            logger.info(f"Phase 1 (TMDb ID): Found {len(found_item_ids)} of {total_to_find} movies in {batch_counter} batches.")
-            
-            # Phase 2: Title-based fallback for unmatched movies
-            missing_tmdb_ids = [id for id in tmdb_ids_str if id not in found_tmdb_ids]
-            if missing_tmdb_ids:
-                logger.info(f"Phase 2 (Title fallback): Searching for {len(missing_tmdb_ids)} unmatched movies by title...")
-                title_matched_ids = self._search_by_title_fallback(missing_tmdb_ids)
-                found_item_ids.extend(title_matched_ids)
-                logger.info(f"Phase 2 complete: Found {len(title_matched_ids)} additional movies by title matching.")
-            
             total_found = len(found_item_ids)
-            logger.info(f"Final result: Found {total_found} of {total_to_find} TMDb movies ({(total_found/total_to_find)*100:.1f}% match rate).")
-            
-            # Update warning threshold since we now have better matching
-            if total_found < total_to_find * 0.9:
-                logger.warning(f"Found only {total_found} of {total_to_find} TMDb movies.")
-                logger.warning("Consider refreshing movie metadata in Emby to improve TMDb ID coverage.")
+            logger.info(f"Found {total_found} of {total_to_find} TMDb movies ({(total_found/total_to_find)*100:.1f}% match rate).")
             
         except Exception as e:
             logger.error(f"Error searching library for TMDb IDs: {e}")
             
         return found_item_ids
 
-    def _search_by_title_fallback(self, missing_tmdb_ids: List[str]) -> List[str]:
-        """
-        Fallback method to find movies by title when TMDb ID matching fails.
-        
-        Args:
-            missing_tmdb_ids: List of TMDb IDs that weren't found by direct ID lookup
-            
-        Returns:
-            List of Emby item IDs found by title matching
-        """
-        from .tmdb_fetcher import TmdbClient
-        import os
-        from difflib import SequenceMatcher
-        
-        # Get TMDb client to fetch movie details
-        tmdb_api_key = os.getenv('TMDB_API_KEY')
-        
-        # Try to get from config file if available
-        try:
-            from .app_logic import load_config
-            config_path = os.getenv('CONFIG_PATH', '/app/config/config.yaml')
-            if os.path.exists(config_path):
-                config = load_config(config_path)
-                tmdb_api_key = config.get('tmdb', {}).get('api_key') or tmdb_api_key
-        except (ImportError, FileNotFoundError, Exception):
-            pass  # Fallback to environment variable
-        if not tmdb_api_key:
-            logger.warning("No TMDb API key available for title fallback matching")
-            return []
-            
-        tmdb_client = TmdbClient(tmdb_api_key)
-        matched_item_ids = []
-        
-        # Get all movies from Emby library for comparison
-        all_movies = self._get_all_library_movies()
-        if not all_movies:
-            logger.warning("Could not retrieve Emby movie library for title matching")
-            return []
-            
-        logger.info(f"Loaded {len(all_movies)} movies from Emby library for title comparison")
-        
-        for tmdb_id in missing_tmdb_ids:
-            try:
-                # Get movie details from TMDb
-                movie_details = tmdb_client.get_movie_details(int(tmdb_id))
-                if not movie_details:
-                    continue
-                    
-                tmdb_title = movie_details.get('title', '').strip()
-                tmdb_year = None
-                if 'release_date' in movie_details and movie_details['release_date']:
-                    tmdb_year = movie_details['release_date'][:4]
-                
-                if not tmdb_title:
-                    continue
-                
-                # Find best matching movie in Emby library
-                best_match = self._find_best_title_match(tmdb_title, tmdb_year, all_movies)
-                if best_match:
-                    matched_item_ids.append(best_match['Id'])
-                    logger.debug(f"Title match: '{tmdb_title}' ({tmdb_year}) -> '{best_match.get('Name')}' ({best_match.get('ProductionYear', 'N/A')})")
-                    
-            except Exception as e:
-                logger.debug(f"Error processing TMDb ID {tmdb_id} for title fallback: {e}")
-                continue
-                
-        return matched_item_ids
     
-    def _get_all_library_movies(self) -> List[dict]:
-        """Get all movies from Emby library with title and year info."""
-        try:
-            params = {
-                'IncludeItemTypes': 'Movie',
-                'Recursive': 'true',
-                'Fields': 'Name,ProductionYear,OriginalTitle,SortName,ProviderIds',
-                'Limit': 10000  # Reasonable limit for most libraries
-            }
-            
-            endpoint = f"/Users/{self.user_id}/Items"
-            data = self._make_api_request('GET', endpoint, params=params)
-            
-            if data and 'Items' in data:
-                return data['Items']
-            return []
-            
-        except Exception as e:
-            logger.error(f"Error fetching all library movies: {e}")
-            return []
     
-    def _find_best_title_match(self, tmdb_title: str, tmdb_year: str, emby_movies: List[dict]) -> dict:
-        """
-        Find the best matching movie in Emby library by title and year.
-        
-        Args:
-            tmdb_title: Title from TMDb
-            tmdb_year: Release year from TMDb (as string)
-            emby_movies: List of Emby movie dictionaries
-            
-        Returns:
-            Best matching Emby movie dict or None
-        """
-        best_match = None
-        best_score = 0.0
-        
-        # Normalize TMDb title for comparison
-        tmdb_title_norm = self._normalize_title(tmdb_title)
-        
-        for movie in emby_movies:
-            # Skip movies that already have TMDb IDs (they should have been found in phase 1)
-            provider_ids = movie.get('ProviderIds', {})
-            if any(key.lower() == 'tmdb' for key in provider_ids.keys()):
-                continue
-            
-            # Get movie titles to compare
-            emby_title = movie.get('Name', '').strip()
-            emby_original_title = movie.get('OriginalTitle', '').strip()
-            emby_year = str(movie.get('ProductionYear', '')) if movie.get('ProductionYear') else None
-            
-            if not emby_title:
-                continue
-                
-            # Calculate similarity scores for different title combinations
-            scores = []
-            
-            # Primary title comparison
-            emby_title_norm = self._normalize_title(emby_title)
-            scores.append(SequenceMatcher(None, tmdb_title_norm, emby_title_norm).ratio())
-            
-            # Original title comparison (if available)
-            if emby_original_title:
-                emby_original_norm = self._normalize_title(emby_original_title)
-                scores.append(SequenceMatcher(None, tmdb_title_norm, emby_original_norm).ratio())
-            
-            # Use the best title match score
-            title_score = max(scores)
-            
-            # Year bonus/penalty
-            year_bonus = 0.0
-            if tmdb_year and emby_year:
-                if tmdb_year == emby_year:
-                    year_bonus = 0.1  # 10% bonus for exact year match
-                elif abs(int(tmdb_year) - int(emby_year)) <= 1:
-                    year_bonus = 0.05  # 5% bonus for year within 1
-                elif abs(int(tmdb_year) - int(emby_year)) > 3:
-                    year_bonus = -0.1  # 10% penalty for year difference > 3
-            
-            final_score = title_score + year_bonus
-            
-            # Only consider matches above 85% similarity
-            if final_score > 0.85 and final_score > best_score:
-                best_score = final_score
-                best_match = movie
-        
-        return best_match if best_score > 0.85 else None
     
-    def _normalize_title(self, title: str) -> str:
-        """Normalize movie title for comparison."""
-        import re
-        # Convert to lowercase and remove common articles, punctuation
-        title = title.lower()
-        title = re.sub(r'^(the|a|an)\s+', '', title)  # Remove leading articles
-        title = re.sub(r'[^\w\s]', '', title)  # Remove punctuation
-        title = re.sub(r'\s+', ' ', title).strip()  # Normalize whitespace
-        return title
 
     def get_item_names_by_ids(self, item_ids: List[str]) -> dict:
         """
