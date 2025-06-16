@@ -305,14 +305,46 @@ class EmbyClient(MediaServerClient):
             logger.info(f"Removed {len(item_ids) - len(unique_item_ids)} duplicate item IDs from collection update")
         
         # Emby's /Collections/{Id}/Items endpoint replaces all items with the provided list.
-        # So, we just pass the full desired list.
-        items_to_set_str = ",".join(unique_item_ids) if unique_item_ids else "" # Handle empty list to clear collection
-        add_items_url = f"{self.server_url}/Collections/{collection_id}/Items?api_key={self.api_key}&Ids={items_to_set_str}"
+        # However, URLs have length limits (Error 414). For large collections, we need to batch the requests.
+        batch_size = 500  # Process items in batches to avoid URL length limits
         
         try:
             logger.info(f"Setting {len(unique_item_ids)} items for collection {collection_id}...")
-            # This POST request replaces the collection's content with the given IDs
-            response = self.session.post(add_items_url, timeout=30) 
+            
+            if len(unique_item_ids) <= batch_size:
+                # Small collection - use single request
+                items_to_set_str = ",".join(unique_item_ids) if unique_item_ids else ""
+                add_items_url = f"{self.server_url}/Collections/{collection_id}/Items?api_key={self.api_key}&Ids={items_to_set_str}"
+                response = self.session.post(add_items_url, timeout=30)
+            else:
+                # Large collection - clear first, then add in batches
+                logger.info(f"Large collection detected ({len(unique_item_ids)} items). Using batch processing...")
+                
+                # First, clear the collection
+                clear_url = f"{self.server_url}/Collections/{collection_id}/Items?api_key={self.api_key}&Ids="
+                response = self.session.post(clear_url, timeout=30)
+                
+                if response.status_code != 204:
+                    logger.error(f"Failed to clear collection before batch update: {response.status_code}")
+                    return False
+                
+                # Then add items in batches using the add endpoint (not replace)
+                add_endpoint = f"{self.server_url}/Collections/{collection_id}/Items?api_key={self.api_key}"
+                
+                for i in range(0, len(unique_item_ids), batch_size):
+                    batch = unique_item_ids[i:i+batch_size]
+                    batch_str = ",".join(batch)
+                    batch_url = f"{add_endpoint}&Ids={batch_str}"
+                    
+                    logger.info(f"Adding batch {i//batch_size + 1}: items {i+1}-{min(i+len(batch), len(unique_item_ids))}")
+                    batch_response = self.session.post(batch_url, timeout=30)
+                    
+                    if batch_response.status_code != 204:
+                        logger.error(f"Failed to add batch {i//batch_size + 1}: {batch_response.status_code}")
+                        return False
+                
+                # Use the last response for the final status check
+                response = batch_response 
             
             if response.status_code == 204: # 204 No Content is success
                 logger.info(f"Successfully set items in collection {collection_id}.")

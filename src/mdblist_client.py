@@ -130,8 +130,16 @@ class MDBListClient:
             if not response:
                 logger.error(f"Failed to fetch page {page_num} for MDBList list: {list_id}")
                 break
+            
+            # Handle both response formats: direct list or dict with 'items' key
+            if isinstance(response, list):
+                items = response
+            elif isinstance(response, dict):
+                items = response.get('items', [])
+            else:
+                logger.error(f"Unexpected response format for MDBList list {list_id}: {type(response)}")
+                break
                 
-            items = response.get('items', [])
             if not items:
                 logger.info(f"No more items found for MDBList list: {list_id} (reached end at page {page_num})")
                 break
