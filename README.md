@@ -5,8 +5,9 @@ TMDbCollector is a Python application that automatically generates and syncs mov
 ## ✨ Features
 - **🎭 Auto-generate collections**: Popular, Top Rated, New Releases, Genres, and major Franchises (e.g., Star Wars, James Bond, Harry Potter)
 - **📋 User-defined Trakt lists**: Create collections by pasting movie lists in the `traktlists/` directory
+- **🎬 MDBList integration**: Create collections from MDBList.com with unlimited pagination support
 - **🖼️ Beautiful collection artwork**: Automatically fetches and applies posters and backdrops from TMDb
-- **🎲 Random movie posters**: Trakt list collections get posters from random movies in the collection
+- **🎨 Custom poster generation**: Professional branded templates for Trakt and MDBList collections
 - **🔍 Smart server detection**: Auto-detects if Emby is configured
 - **📝 Customizable recipes**: Easily edit or extend collection logic in `src/collection_recipes.py`
 - **🛡️ Robust error handling & logging**
@@ -22,7 +23,7 @@ TMDbCollector is a Python application that automatically generates and syncs mov
 
 1. Create a directory for the project and navigate into it
 2. Create a `config` subdirectory and add your `config/config.yaml` file (see example below)
-3. Create a `traktlists` subdirectory for your custom movie lists (optional)
+3. Create `traktlists` and `mdblists` subdirectories for your custom movie lists (optional)
 4. Run with Docker Compose:
    ```sh
    docker compose up -d
@@ -60,6 +61,16 @@ traktlists:
   random_poster: true                    # Use random movie poster from collection
   max_items_per_collection: 0            # Maximum items per collection (0 = no limit)
 
+# MDBList configuration (optional - for MDBList.com integration)
+mdblist:
+  api_key: "YOUR_MDBLIST_API_KEY"        # Get from https://mdblist.com/preferences
+
+# MDBList local files configuration
+mdblists:
+  enabled: true                          # Enable/disable MDBList processing
+  directory: "mdblists"                  # Directory to scan for MDBList files
+  max_items_per_collection: 0            # Maximum items per collection (0 = unlimited)
+
 # Custom poster generation settings
 poster_settings:
   # Enable/disable custom poster generation when TMDb doesn't provide one
@@ -94,13 +105,14 @@ services:
     volumes:
       - ./config:/app/config:ro
       - ./traktlists:/app/traktlists:ro
+      - ./mdblists:/app/mdblists:ro
     environment:
       - SYNC_TARGET=auto  # Options: auto, emby
     restart: unless-stopped
 ```
 
 2. Create a `config` directory and add your `config.yaml` file
-3. Optionally create a `traktlists` directory for your custom movie lists
+3. Optionally create `traktlists` and `mdblists` directories for your custom movie lists
 4. Start the service:
 
 ```sh
@@ -123,6 +135,7 @@ docker run -d \
   -e SYNC_TARGET=auto \
   -v $(pwd)/config:/app/config:ro \
   -v $(pwd)/traktlists:/app/traktlists:ro \
+  -v $(pwd)/mdblists:/app/mdblists:ro \
   ghcr.io/d3v1l1989/tmdbcollector:latest
 ```
 
@@ -134,6 +147,7 @@ docker run -d `
   -e SYNC_TARGET=auto `
   -v ${PWD}/config:/app/config:ro `
   -v ${PWD}/traktlists:/app/traktlists:ro `
+  -v ${PWD}/mdblists:/app/mdblists:ro `
   ghcr.io/d3v1l1989/tmdbcollector:latest
 ```
 
@@ -193,9 +207,13 @@ TMDbCollector comes with pre-configured collections like:
 
 You can customize these in `src/collection_recipes.py`.
 
-### 📋 User-Defined Trakt Lists
+### 📋 User-Defined Lists
 
-Create your own movie collections by simply placing text files in the `traktlists/` directory!
+Create your own movie collections using two different methods:
+
+#### 🎬 Trakt Lists (traktlists/)
+
+Create collections by placing text files in the `traktlists/` directory:
 
 #### How to Use
 
@@ -228,12 +246,56 @@ https://trakt.tv/users/username/lists/my-list
 - **Trakt List URLs**: `https://trakt.tv/users/username/lists/list-name`
 - **Comments**: Lines starting with `#` for organization
 
-#### Features
+#### Trakt Features
 
 - **🎲 Random Posters**: Each collection gets a poster from a randomly selected movie
 - **📁 Simple Organization**: One file = one collection (filename becomes collection name)
 - **🔄 Automatic Processing**: Collections are created/updated every time the app runs
 - **⚙️ Configurable**: Control via `traktlists` section in config.yaml
+
+#### 🎬 MDBList Collections (mdblists/)
+
+Create collections using MDBList.com data by placing text files in the `mdblists/` directory:
+
+##### How to Use
+
+1. **Create a text file** in the `mdblists/` directory
+   - Example: `Action Favorites.txt` becomes a collection called "Action Favorites"
+
+2. **Add your movies** using any of these formats:
+
+```
+# Action Favorites.txt
+
+# Movies by TMDb ID
+550        # Fight Club
+245891     # John Wick
+155        # The Dark Knight
+
+# Movies by title (searched automatically)
+Mad Max: Fury Road
+The Matrix
+Heat
+
+# MDBList URLs (requires API key)
+https://mdblist.com/lists/username/best-action-movies
+```
+
+##### Supported Formats
+
+- **TMDb IDs**: `550` (Fight Club)
+- **Movie Titles**: `The Matrix` (automatically searched on TMDb)
+- **MDBList URLs**: `https://mdblist.com/lists/username/list-name` (requires API key)
+- **Comments**: Lines starting with `#` for organization
+
+##### MDBList Features
+
+- **🎨 Custom Branded Posters**: Professional MDBList-branded poster templates
+- **🔄 Unlimited Pagination**: Fetches all items from large MDBList collections automatically
+- **📁 Simple Organization**: One file = one collection (filename becomes collection name)
+- **🔄 Automatic Processing**: Collections are created/updated every time the app runs
+- **⚙️ Configurable**: Control via `mdblists` section in config.yaml
+- **🌐 API Integration**: Optional MDBList API key for accessing MDBList URLs
 
 ### 🖼️ Automatic Artwork
 
@@ -242,6 +304,7 @@ TMDbCollector automatically adds artwork to your collections:
 - 🖼️ For franchise collections: Uses official TMDb collection artwork
 - 🎨 For dynamic collections (Popular, Genres): Uses artwork from the first movie
 - 🎲 For Trakt list collections: Uses artwork from a randomly selected movie in the collection
+- 🎬 For MDBList collections: Uses custom branded poster templates with MDBList styling
 
 ## 🔍 Troubleshooting
 
@@ -270,6 +333,10 @@ TMDbCollector automatically adds artwork to your collections:
   2. Create a new application (name it whatever you want)
   3. Copy the **Client ID** - this is all you need for public lists
   4. For private lists/authentication, you'll also need the **Client Secret**
+- **MDBList** (optional, for MDBList URL support):
+  1. Create a free account at [mdblist.com](https://mdblist.com)
+  2. Go to [mdblist.com/preferences](https://mdblist.com/preferences)
+  3. Copy your **API Key** - required for processing MDBList URLs in your collections
 
 ---
 

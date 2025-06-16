@@ -7,6 +7,7 @@ services:
     volumes:
       - ./config:/app/config:ro
       - ./traktlists:/app/traktlists:ro
+      - ./mdblists:/app/mdblists:ro
     # Configuration is controlled via config.yaml
     # You can still override specific settings with environment variables if needed
     environment:
