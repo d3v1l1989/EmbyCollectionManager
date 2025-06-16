@@ -125,11 +125,44 @@ class MDBListClient:
             }
             
             logger.debug(f"Fetching page {page_num} (offset: {offset}, limit: {current_batch_size}) for MDBList list: {list_id}")
-            response = self._make_request(f"lists/{list_id}/items", params)
+            
+            # Try different endpoint formats based on common API patterns
+            endpoints_to_try = [
+                f"lists/{list_id}/items",
+                f"lists/{list_id}",  # Original endpoint with items in response
+                f"list/{list_id}/items",  # Alternative singular form
+                f"list/{list_id}",
+            ]
+            
+            response = None
+            for endpoint in endpoints_to_try:
+                logger.debug(f"Trying endpoint: {endpoint}")
+                response = self._make_request(endpoint, params)
+                if response:
+                    logger.info(f"Successful response from endpoint: {endpoint}")
+                    break
+                else:
+                    logger.debug(f"No response from endpoint: {endpoint}")
+            
+            if not response:
+                # Try without offset/limit params which might not be supported
+                logger.debug("Trying without pagination params...")
+                for endpoint in endpoints_to_try:
+                    response = self._make_request(endpoint, {'apikey': self.api_key})
+                    if response:
+                        logger.info(f"Successful response from endpoint (no pagination): {endpoint}")
+                        break
             
             if not response:
                 logger.error(f"Failed to fetch page {page_num} for MDBList list: {list_id}")
                 break
+            
+            # Debug: Log the actual response structure
+            if page_num == 1:  # Only log for first page to avoid spam
+                logger.info(f"MDBList API response type: {type(response)}")
+                if isinstance(response, dict):
+                    logger.info(f"MDBList API response keys: {list(response.keys())}")
+                logger.info(f"MDBList API response (first 200 chars): {str(response)[:200]}...")
             
             # Handle both response formats: direct list or dict with 'items' key
             if isinstance(response, list):
