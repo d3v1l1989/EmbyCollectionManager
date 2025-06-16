@@ -125,7 +125,7 @@ class MDBListClient:
             }
             
             logger.debug(f"Fetching page {page_num} (offset: {offset}, limit: {current_batch_size}) for MDBList list: {list_id}")
-            response = self._make_request(f"lists/{list_id}", params)
+            response = self._make_request(f"lists/{list_id}/items", params)
             
             if not response:
                 logger.error(f"Failed to fetch page {page_num} for MDBList list: {list_id}")
