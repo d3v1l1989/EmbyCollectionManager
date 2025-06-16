@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 
-# This file contains categorized collection recipes for the TMDbCollector application
+# This file contains categorized collection recipes for the Emby Collection Manager application
 # Recipes are organized by category for easier maintenance and readability
 
 # Configuration section mapping category numbers to their properties

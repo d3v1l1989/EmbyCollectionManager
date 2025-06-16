@@ -1,5 +1,5 @@
 """
-Collection Poster Manager Module for TMDbCollector
+Collection Poster Manager Module for Emby Collection Manager
 
 This module manages the creation of custom posters for collections based on their categories.
 It identifies the appropriate template for each collection and generates a poster with text overlay.

@@ -1,6 +1,6 @@
-# 🎬 TMDbCollector
+# 🎬 Emby Collection Manager
 
-TMDbCollector is a Python application that automatically generates and syncs movie collections in your Emby server, using dynamic lists and franchise data fetched from The Movie Database (TMDb). Inspired by the Stremio TMDb collections addon, it keeps your media server collections fresh and relevant—no manual curation required.
+Emby Collection Manager is a Python application that automatically generates and syncs movie collections in your Emby server, using dynamic lists and franchise data fetched from The Movie Database (TMDb). Inspired by the Stremio TMDb collections addon, it keeps your media server collections fresh and relevant—no manual curation required.
 
 ## ✨ Features
 - **🎭 Auto-generate collections**: Popular, Top Rated, New Releases, Genres, and major Franchises (e.g., Star Wars, James Bond, Harry Potter)
@@ -31,12 +31,12 @@ TMDbCollector is a Python application that automatically generates and syncs mov
 
 ## ⚙️ Configuration
 
-Configure TMDbCollector using a **config.yaml** file in the config directory (example below):
+Configure Emby Collection Manager using a **config.yaml** file in the config directory (example below):
 
 ### Example config.yaml
 
 ```yaml
-# Config file for TMDbCollector
+# Config file for Emby Collection Manager
 # API keys and server details organized by service
 
 # TMDb configuration
@@ -91,7 +91,7 @@ poster_settings:
 
 ### 🐳 Option 1: Docker Compose (Recommended)
 
-The easiest way to run TMDbCollector is with Docker Compose:
+The easiest way to run Emby Collection Manager is with Docker Compose:
 
 1. Create a `docker-compose.yml` file with the following content:
 
@@ -99,9 +99,9 @@ The easiest way to run TMDbCollector is with Docker Compose:
 version: '3.8'
 
 services:
-  tmdbcollector:
-    image: ghcr.io/d3v1l1989/tmdbcollector:latest
-    container_name: tmdbcollector
+  emby-collection-manager:
+    image: ghcr.io/d3v1l1989/emby-collection-manager:latest
+    container_name: emby-collection-manager
     volumes:
       - ./config:/app/config:ro
       - ./traktlists:/app/traktlists:ro
@@ -122,33 +122,33 @@ docker compose up -d
 4. View logs:
 
 ```sh
-docker compose logs -f tmdbcollector
+docker compose logs -f emby-collection-manager
 ```
 
 ### 🐳 Option 2: Standalone Docker
 
-You can also run TMDbCollector directly with Docker:
+You can also run Emby Collection Manager directly with Docker:
 
 ```sh
 docker run -d \
-  --name tmdbcollector \
+  --name emby-collection-manager \
   -e SYNC_TARGET=auto \
   -v $(pwd)/config:/app/config:ro \
   -v $(pwd)/traktlists:/app/traktlists:ro \
   -v $(pwd)/mdblists:/app/mdblists:ro \
-  ghcr.io/d3v1l1989/tmdbcollector:latest
+  ghcr.io/d3v1l1989/emby-collection-manager:latest
 ```
 
 On Windows PowerShell, use:
 
 ```powershell
 docker run -d `
-  --name tmdbcollector `
+  --name emby-collection-manager `
   -e SYNC_TARGET=auto `
   -v ${PWD}/config:/app/config:ro `
   -v ${PWD}/traktlists:/app/traktlists:ro `
   -v ${PWD}/mdblists:/app/mdblists:ro `
-  ghcr.io/d3v1l1989/tmdbcollector:latest
+  ghcr.io/d3v1l1989/emby-collection-manager:latest
 ```
 
 ### 🐍 Option 3: Direct Python Installation
@@ -157,8 +157,8 @@ If you prefer to run without Docker:
 
 1. Clone the repository:
    ```sh
-   git clone https://github.com/d3v1l1989/TMDbCollector.git
-   cd TMDbCollector
+   git clone https://github.com/d3v1l1989/EmbyCollectionManager.git
+   cd EmbyCollectionManager
    ```
 
 2. Install dependencies:
@@ -190,14 +190,14 @@ Arguments:
 To build the Docker image locally:
 
 ```sh
-git clone https://github.com/d3v1l1989/TMDbCollector.git
-cd TMDbCollector
-docker build -t tmdbcollector .
+git clone https://github.com/d3v1l1989/EmbyCollectionManager.git
+cd EmbyCollectionManager
+docker build -t emby-collection-manager .
 ```
 
 ### 📚 Collection Recipes
 
-TMDbCollector comes with pre-configured collections like:
+Emby Collection Manager comes with pre-configured collections like:
 
 - 🌟 Popular Movies on TMDb
 - 🏆 Top Rated Movies on TMDb
@@ -299,7 +299,7 @@ https://mdblist.com/lists/username/best-action-movies
 
 ### 🖼️ Automatic Artwork
 
-TMDbCollector automatically adds artwork to your collections:
+Emby Collection Manager automatically adds artwork to your collections:
 
 - 🖼️ For franchise collections: Uses official TMDb collection artwork
 - 🎨 For dynamic collections (Popular, Genres): Uses artwork from the first movie
@@ -313,7 +313,7 @@ TMDbCollector automatically adds artwork to your collections:
 1. **🛑 The container exits immediately**
    - Check that your TMDb API key is valid
    - Check that your config file or environment variables are correctly set
-   - Look at the logs: `docker logs tmdbcollector`
+   - Look at the logs: `docker logs emby-collection-manager`
 
 2. **❓ Collections don't appear in server**
    - Ensure your Emby API key and user ID are correct

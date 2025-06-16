@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  tmdbcollector:
-    image: ghcr.io/d3v1l1989/tmdbcollector:latest
-    container_name: tmdbcollector
+  emby-collection-manager:
+    image: ghcr.io/d3v1l1989/emby-collection-manager:latest
+    container_name: emby-collection-manager
     volumes:
       - ./config:/app/config:ro
       - ./traktlists:/app/traktlists:ro

@@ -1,5 +1,5 @@
 """
-Poster Generator Module for TMDbCollector
+Poster Generator Module for Emby Collection Manager
 
 This module provides functionality to generate custom collection posters
 with text overlay when TMDb doesn't provide poster images.
@@ -82,7 +82,7 @@ def generate_custom_poster(
             "/app/resources",
             # Additional fallback locations
             os.path.join(os.path.dirname(__file__), "resources"),
-            "/opt/tmdbcollector/resources"
+            "/opt/emby-collection-manager/resources"
         ]
         
         for location in possible_locations:

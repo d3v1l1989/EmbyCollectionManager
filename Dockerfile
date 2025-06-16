@@ -1,4 +1,4 @@
-# Dockerfile for TMDbCollector
+# Dockerfile for Emby Collection Manager
 FROM python:3.11-slim
 
 # Set environment variables

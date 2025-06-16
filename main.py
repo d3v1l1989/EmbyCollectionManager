@@ -1,4 +1,4 @@
-# Entry point for TMDbCollector
+# Entry point for Emby Collection Manager
 
 from src.config_loader import ConfigLoader
 from src.logging_setup import setup_logging
@@ -12,7 +12,7 @@ from src.app_logic import main as app_main
 def main():
     # Setup logging and verify config
     setup_logging()
-    logger = logging.getLogger("TMDbCollector")
+    logger = logging.getLogger("EmbyCollectionManager")
     
     # Get the RUN_ONCE flag from environment
     run_once = os.getenv('RUN_ONCE', 'false').lower() == 'true'
@@ -20,7 +20,7 @@ def main():
     # Define the interval (24 hours in seconds)
     interval_seconds = 24 * 60 * 60  # 24 hours
     
-    logger.info(f"Starting TMDbCollector {'in one-time mode' if run_once else 'in continuous mode with 24-hour interval'}")
+    logger.info(f"Starting Emby Collection Manager {'in one-time mode' if run_once else 'in continuous mode with 24-hour interval'}")
     
     while True:
         try:
@@ -72,7 +72,7 @@ def main():
             time.sleep(interval_seconds)
             
         except KeyboardInterrupt:
-            logger.info("TMDbCollector stopped by user")
+            logger.info("Emby Collection Manager stopped by user")
             break
         except Exception as e:
             logger.error(f"Error in main loop: {e}")

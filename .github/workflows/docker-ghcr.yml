@@ -30,4 +30,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/d3v1l1989/tmdbcollector:latest
+          tags: ghcr.io/d3v1l1989/emby-collection-manager:latest

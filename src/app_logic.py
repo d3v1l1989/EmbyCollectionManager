@@ -2,7 +2,7 @@ import argparse
 import sys
 import logging
 import random
-from src.tmdb_fetcher import TmdbClient
+from src.tmdb_client import TmdbClient
 from src.trakt_client import TraktClient
 from src.trakt_list_processor import TraktListProcessor
 from src.mdblist_client import MDBListClient
@@ -31,7 +31,7 @@ def load_config(config_path: str) -> dict:
         logger.error(f"Failed to load configuration file '{config_path}': {e}")
         raise
 def main():
-    parser = argparse.ArgumentParser(description="Sync TMDb collections to Emby/Jellyfin.")
+    parser = argparse.ArgumentParser(description="Sync movie collections to Emby using TMDb data.")
     parser.add_argument('--config', type=str, default='config/config.yaml', help='Path to config YAML file')
     parser.add_argument('--targets', type=str, default='auto', 
                       choices=['auto', 'emby'],

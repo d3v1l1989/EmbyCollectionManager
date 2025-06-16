@@ -1,5 +1,5 @@
 """
-MDBList Processor for TMDbCollector
+MDBList Processor for Emby Collection Manager
 
 This module processes user-created text files in the mdblists directory
 and converts them into collections with TMDb movie IDs.

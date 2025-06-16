@@ -1,5 +1,5 @@
 """
-MDBList Client for TMDbCollector
+MDBList Client for Emby Collection Manager
 
 This module provides a client for interacting with the MDBList API
 to retrieve movie and TV show lists from various sources.
@@ -29,7 +29,7 @@ class MDBListClient:
         self.base_url = "https://api.mdblist.com"
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'TMDbCollector/1.0'
+            'User-Agent': 'Emby Collection Manager/1.0'
         })
         
         # Rate limiting

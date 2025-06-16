@@ -1,5 +1,5 @@
 """
-Trakt List Processor for TMDbCollector
+Trakt List Processor for Emby Collection Manager
 
 This module processes user-created text files in the traktlists directory
 and converts them into collections with TMDb movie IDs.

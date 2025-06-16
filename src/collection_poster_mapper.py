@@ -1,5 +1,5 @@
 """
-Collection Poster Mapper Module for TMDbCollector
+Collection Poster Mapper Module for Emby Collection Manager
 
 This module provides functionality to map collections to their appropriate poster templates
 based on their category IDs and CATEGORY_CONFIG in collection_recipes.py.
