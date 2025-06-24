@@ -13,6 +13,22 @@ Emby Collection Manager is a Python application that automatically generates and
 - **🛡️ Robust error handling & logging**
 - **⚙️ Configurable via YAML config file**
 
+## 📸 Screenshots
+
+See Emby Collection Manager in action:
+
+![Trakt and MDBList Collections](screenshots/screenshot0.png)
+*Trakt lists and MDBList collections automatically generated with custom branded posters*
+
+![Collection Overview](screenshots/screenshot1.jpeg)
+*Various movie collections organized by genre, franchise, and custom lists*
+
+![Collection Details](screenshots/screenshot2.jpeg)
+*Individual collection view showing movies with artwork*
+
+![Collection Library](screenshots/screenshot3.jpeg)
+*Full collection library showing the breadth of automatically generated collections*
+
 ## 📋 Requirements
 - 🐍 Python 3.8+ (for direct installation)
 - 🐳 Docker (for containerized installation - recommended)
