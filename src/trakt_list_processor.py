@@ -183,10 +183,16 @@ class TraktListProcessor:
         if not line:
             return []
             
-        # 1. Check for Trakt list URL
+        # 1. Check for Trakt list URL - support both formats
+        # Format 1: https://trakt.tv/users/USERNAME/lists/LISTNAME
         trakt_url_match = re.match(r'https://trakt\.tv/users/([^/]+)/lists/([^/?]+)', line)
         if trakt_url_match:
             return self.process_trakt_list_url(trakt_url_match.group(1), trakt_url_match.group(2), collection_name)
+        
+        # Format 2: https://trakt.tv/lists/LISTID (public lists)
+        trakt_public_url_match = re.match(r'https://trakt\.tv/lists/([^/?]+)', line)
+        if trakt_public_url_match:
+            return self.process_trakt_public_list_url(trakt_public_url_match.group(1), collection_name)
             
         # 2. Check for direct TMDb ID (just a number)
         if line.isdigit():
@@ -224,6 +230,31 @@ class TraktListProcessor:
             return tmdb_ids
         except Exception as e:
             logger.error(f"Failed to process Trakt list {username}/{list_slug}: {e}")
+            return []
+    
+    def process_trakt_public_list_url(self, list_id: str, collection_name: str) -> List[int]:
+        """
+        Process a public Trakt list URL and extract TMDb IDs.
+        
+        Args:
+            list_id: Trakt public list ID
+            collection_name: Collection name for logging
+            
+        Returns:
+            List of TMDb IDs from the Trakt list
+        """
+        if not self.trakt_client:
+            logger.error(f"Trakt client not available for processing URL in '{collection_name}'")
+            return []
+            
+        try:
+            logger.info(f"Fetching public Trakt list: {list_id}")
+            trakt_items = self.trakt_client.get_public_list_items(list_id, 'movies')
+            tmdb_ids = self.trakt_client.extract_tmdb_ids(trakt_items, 'movie')
+            logger.info(f"Found {len(tmdb_ids)} movies from public Trakt list {list_id}")
+            return tmdb_ids
+        except Exception as e:
+            logger.error(f"Failed to process public Trakt list {list_id}: {e}")
             return []
     
     def search_movie_by_title(self, title: str, collection_name: str, line_num: int) -> List[int]:

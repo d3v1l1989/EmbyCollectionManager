@@ -64,12 +64,20 @@ def main():
                 logger.info("Exiting after one-time execution as requested")
                 break
                 
-            # Calculate next run time
+            # Calculate next run time and sleep duration
             next_run = start_time + timedelta(seconds=interval_seconds)
-            logger.info(f"Next sync scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')} (in 24 hours)")
+            current_time = datetime.now()
+            sleep_duration = (next_run - current_time).total_seconds()
+            
+            # Ensure we don't have negative sleep duration
+            if sleep_duration < 0:
+                logger.warning(f"Sync took longer than expected. Next run will start immediately.")
+                sleep_duration = 0
+            
+            logger.info(f"Next sync scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')} (in {sleep_duration/3600:.1f} hours)")
             
             # Sleep until next run time
-            time.sleep(interval_seconds)
+            time.sleep(sleep_duration)
             
         except KeyboardInterrupt:
             logger.info("Emby Collection Manager stopped by user")

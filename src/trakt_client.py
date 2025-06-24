@@ -204,6 +204,53 @@ class TraktClient:
         self.logger.info(f"Retrieved {len(all_items)} total items from list {username}/{list_slug}")
         return all_items
     
+    def get_public_list_items(self, list_id: str, item_type: str = 'movies') -> List[Dict]:
+        """
+        Get all items from a public list using pagination.
+        
+        Args:
+            list_id: Public list ID
+            item_type: Type of items to fetch ('movies', 'shows', 'all')
+            
+        Returns:
+            List of all items with metadata
+        """
+        endpoint = f"/lists/{list_id}/items"
+        all_items = []
+        page = 1
+        limit = 100  # Use 100 items per page for efficiency
+        
+        while True:
+            # Add pagination and type filter parameters
+            params = {
+                'page': page,
+                'limit': limit
+            }
+            if item_type != 'all':
+                params['type'] = item_type
+            
+            self.logger.debug(f"Fetching page {page} for public list {list_id} (limit: {limit})")
+            response = self._make_request('GET', endpoint, params=params)
+            
+            if not response:
+                break
+                
+            # Check if we got any items
+            if len(response) == 0:
+                break
+                
+            all_items.extend(response)
+            self.logger.debug(f"Got {len(response)} items from page {page}, total so far: {len(all_items)}")
+            
+            # If we got fewer items than the limit, we've reached the end
+            if len(response) < limit:
+                break
+                
+            page += 1
+        
+        self.logger.info(f"Retrieved {len(all_items)} total items from public list {list_id}")
+        return all_items
+    
     def get_watchlist(self, username: str = 'me', item_type: str = 'movies') -> List[Dict]:
         """
         Get user's watchlist.
